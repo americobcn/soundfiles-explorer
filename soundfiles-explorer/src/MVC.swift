@@ -8,11 +8,30 @@
 import Cocoa
 import AVKit
 
-public struct AudioFile {
+
+private struct AudioFile {
     let name: String
     let url: URL
+    let chCount: Int
+    let bitDepth: Int
+    let sampleRate: Float
     let bext: BEXTMetadata?
     let ixml: IXMLMetadata?
+}
+
+enum TableColumnIdentifiers: String, CaseIterable {
+    case fileName = "fileName"
+    case scene = "scene"
+    case take = "take"
+    case takeType = "takeType"
+    case tape = "tape"
+    case timeCodeStart = "timeCodeStart"
+    case timeCodeRate = "timeCodeRate"
+    case channels = "channels"
+    case circled = "circled"
+    case date = "date"
+    case time = "time"
+    case audioDescription = "audioDescription"
 }
 
 
@@ -22,25 +41,36 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
     @IBOutlet weak var searchField: NSSearchField!
     @IBOutlet weak var playerView: AVPlayerView!
     
-    var audioFiles: [AudioFile] = []
-    var player: AVPlayer!
-    let amr = AudioMetadataReader()
+    //MARK: Variables
+    private var player: AVPlayer!
+    private var audioFiles: [AudioFile] = []
+    private var notLoadedFiles: [String] = []
+    private let metadataReader = AudioMetadataReader()
     
+    //MARK: Methods
     required init?(coder: NSCoder) {
         super.init(coder: coder)
     }
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        setupTableView()
+        setupPlayer()
+    }
+    
+    private func setupTableView() {
         tableView.delegate = self
         tableView.dataSource = self
         tableView.registerForDraggedTypes([.fileURL])
         tableView.allowsMultipleSelection = false
+    }
+    
+    private func setupPlayer() {
         self.player = AVPlayer()
         self.playerView.player = self.player
-        
-        // readFile()
+        self.playerView.controlsStyle = .inline
     }
+    
     
     
     //MARK: NSTableViewDataSource methods
@@ -51,56 +81,77 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
     
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let colIdentifier = tableColumn?.identifier else { return nil }
-        switch colIdentifier {
-        case NSUserInterfaceItemIdentifier(rawValue: "fileName"):
-            guard let viewCell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: "fileName"), owner: nil ) as? NSTableCellView
+        switch TableColumnIdentifiers(rawValue: colIdentifier.rawValue) {
+        case .fileName:
+            guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
             viewCell.textField!.stringValue = "\(audioFiles[row].name)"
             return viewCell
-        case NSUserInterfaceItemIdentifier(rawValue: "scene"):
-            guard let viewCell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: "scene"), owner: nil ) as? NSTableCellView
+        case .scene:
+            guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].ixml!.scene ?? "")"
+            viewCell.textField!.stringValue = "\(audioFiles[row].ixml?.scene ?? "")"
             return viewCell
-        case NSUserInterfaceItemIdentifier(rawValue: "take"):
-            guard let viewCell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: "take"), owner: nil ) as? NSTableCellView
+        case .take:
+            guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].ixml!.take ?? "")"
+            viewCell.textField!.stringValue = "\(audioFiles[row].ixml?.take ?? "")"
             return viewCell
-        case NSUserInterfaceItemIdentifier(rawValue: "tape"):
-            guard let viewCell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: "tape"), owner: nil ) as? NSTableCellView
+        case .takeType:
+            guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].ixml!.parsedData["TAPE"] ?? "")"
+            viewCell.textField!.stringValue = "\(audioFiles[row].ixml?.parsedData["TAKE_TYPE"] ?? "")"
             return viewCell
-        case NSUserInterfaceItemIdentifier(rawValue: "timeCodeRate"):
-            guard let viewCell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: "timeCodeRate"), owner: nil ) as? NSTableCellView
+        case .tape:
+            guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].ixml!.parsedData["TIMECODE_RATE"] ?? "") \(audioFiles[row].ixml!.parsedData["TIMECODE_FLAG"] ?? "")"
+            viewCell.textField!.stringValue = "\(audioFiles[row].ixml?.parsedData["TAPE"] ?? "")"
             return viewCell
-        case NSUserInterfaceItemIdentifier(rawValue: "channels"):
-            guard let viewCell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: "channels"), owner: nil ) as? NSTableCellView
+        case .timeCodeStart:
+            guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].ixml!.parsedData["TRACK_COUNT"] ?? "")ch"
+            var TCStart: String = ""
+            if let bext = audioFiles[row].bext, let ixml = audioFiles[row].ixml {
+                if let sr = ixml.parsedData["TIMESTAMP_SAMPLE_RATE"],  let tcr = ixml.parsedData["DISPLAYED_TC_FPS"] {
+                    TCStart = timecodeFromTimeReference(samples: Int64(bext.timeReferenceSamples),
+                                                        sampleRate: Double(sr)!,
+                                                        frameRate: Double(tcr)!
+                    )
+                }
+            }
+            
+            viewCell.textField!.stringValue = TCStart
             return viewCell
-        case NSUserInterfaceItemIdentifier(rawValue: "circled"):
-            guard let viewCell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: "circled"), owner: nil ) as? NSTableCellView
+        case .timeCodeRate:
+            guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].ixml!.parsedData["CIRCLED"] ?? "")"
+            viewCell.textField!.stringValue = "\(audioFiles[row].ixml?.parsedData["DISPLAYED_TC_FPS"] ?? "") \(audioFiles[row].ixml?.parsedData["TIMECODE_FLAG"] ?? "")"
             return viewCell
-        case NSUserInterfaceItemIdentifier(rawValue: "date"):
-            guard let viewCell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: "date"), owner: nil ) as? NSTableCellView
+        case .channels:
+            guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
+            else { return nil }
+            // viewCell.textField!.stringValue = "\(audioFiles[row].ixml?.parsedData["TRACK_COUNT"] ?? "")"
+            viewCell.textField!.stringValue = "\(audioFiles[row].chCount)"
+            return viewCell
+        case .circled:
+            guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
+            else { return nil }
+            viewCell.textField!.stringValue = "\(audioFiles[row].ixml?.parsedData["CIRCLED"] ?? "")"
+            return viewCell
+        case .date:
+            guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
             viewCell.textField!.stringValue = "\(audioFiles[row].bext?.originationDate ?? "")"
             return viewCell
-        case NSUserInterfaceItemIdentifier(rawValue: "time"):
-            guard let viewCell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: "time"), owner: nil ) as? NSTableCellView
+        case .time:
+            guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
             viewCell.textField!.stringValue = "\(audioFiles[row].bext?.originationTime ?? "")"
             return viewCell
-        case NSUserInterfaceItemIdentifier(rawValue: "audioDescription"):
-            guard let viewCell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: "audioDescription"), owner: nil ) as? NSTableCellView
+        case .audioDescription:
+            guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].bext?.codingHistory ?? "")"
+            viewCell.textField!.stringValue = "\(audioFiles[row].bitDepth)b \(audioFiles[row].sampleRate)Hz"
             return viewCell
         default:
             return nil
@@ -108,32 +159,25 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
     }
 
     
-    // func tableView(_ tableView: NSTableView, objectValueFor tableColumn: NSTableColumn?, row: Int) -> Any? {
-    //
-    // }
-    
-    
     // MARK:  TableView Delegate Methods
     func tableViewSelectionDidChange(_ notification: Notification) {
         let tableView = notification.object as! NSTableView
         let selectedRow = tableView.selectedRow
         if selectedRow != -1 {
-            // Pause playing
             if self.playerView.player?.rate != 0.0 {
                 self.playerView.player?.rate = 0.0
             }
+            
             let playerItem = AVPlayerItem(url: audioFiles[selectedRow].url)
             self.player.replaceCurrentItem(with: playerItem)
-            // Load WAV on the player
-            // let selectedFileMetadata = AudioMetadata(bext: audioFiles[selectedRow].bext, ixml: audioFiles[selectedRow].ixml)
-            // let rows = amr.extractTableViewRows(from: selectedFileMetadata)
-            print("\nFILE DESCRIPTION START")
-            //for row in audioFiles[selectedRow].ixml!.parsedData {
-            //    print("\(row): \(row.value)")
-            //}
-            print("BEXT: \(audioFiles[selectedRow].bext)")
             
+            #if DEBUG
+            print("\nFILE DESCRIPTION START")
+            print("BEXT: \(audioFiles[selectedRow].bext, default: "nil")\n")
+            print("iXML(parsedData): \(audioFiles[selectedRow].ixml?.parsedData, default: "")")
+            print("iXML(rawData): \(audioFiles[selectedRow].ixml?.rawXML ?? "")")
             print("FILE DESCRIPTION END\n")
+            #endif
         }
     }
     
@@ -160,43 +204,140 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
                   pasteboardObjects.count > 0 else {
                 return false
             }
-            
+            notLoadedFiles.removeAll()
             pasteboardObjects.forEach { (object) in
                 if let url = object as? URL {
                     do {
-                        let data = try amr.readAudioMetadata(from: url)
-                        let audioFile = AudioFile(name: url.lastPathComponent, url: url, bext: data.bext, ixml: data.ixml)
-                        self.audioFiles.append(audioFile)
+                        let data = try metadataReader.readAudioMetadata(from: url)
+                        
+                        Task {
+                            let asbd = try await loadAudioBasicDescription(for: url)
+                            let audioFile = AudioFile(name: url.deletingPathExtension().lastPathComponent,
+                                                      url: url,
+                                                      chCount: Int(asbd.mChannelsPerFrame),
+                                                      bitDepth: Int(asbd.mBitsPerChannel),
+                                                      sampleRate: Float(asbd.mSampleRate),
+                                                      bext: data.bext,
+                                                      ixml: data.ixml)
+                            self.audioFiles.append(audioFile)
+                            await MainActor.run {
+                                    tableView.reloadData()
+                            }
+                        }
+                        
                     } catch {
-                        print(error.localizedDescription)
-                        let alert = NSAlert()
-                        alert.alertStyle = .warning
-                        alert.messageText = error.localizedDescription
-                        alert.runModal()
+                        self.notLoadedFiles.append(url.lastPathComponent)
                     }
                 }
             }
-            tableView.reloadData()
+            if notLoadedFiles.count > 0 {
+                let alert = NSAlert()
+                alert.messageText = "Some files could not be loaded."
+                alert.informativeText = notLoadedFiles.joined(separator: ", ")
+                alert.runModal()
+            }
+            
             return true
         }
         return false
     }
 
-    
-    
-    private func readFile() {
-        let fileURL = URL(fileURLWithPath: "/Volumes/MediaSSD/So_Directe/2025-11-12.AAN/SL7708_____16_39______1__PN.WAV")
-        do {
-            let data = try amr.readAudioMetadata(from: fileURL)
-            // print("BEXT:\(String(describing: data.bext))\n\niXML:\(String(describing: data.ixml))")
-            let rows = amr.extractTableViewRows(from: data)
-            for row in rows {
-                print("\(row.field): \(row.value)")
-            }
-        } catch {
-            print(error.localizedDescription)
+    // MARK: Keyboard event handlers
+    override func keyDown(with event: NSEvent) {
+        switch event.keyCode {
+        case 49: // Space Bar
+            playPause()
+            break
+        case 38: // J
+            playRewind()
+            break
+        case 40: // K
+            playPause()
+            break
+        case 37: // L
+            playForward()
+            break
+        default:
+            super.keyDown(with: event)
         }
     }
     
+        
+    private func playPause() {
+        if playerView.player?.rate == 0.0  {
+            playerView.player?.play()
+        } else {
+            playerView.player?.pause()
+        }
+    }
     
+    private func playRewind() {
+        playerView.player?.rate = playerView.player!.rate - 1.5
+    }
+    
+    private func playForward() {
+        playerView.player?.rate = playerView.player!.rate + 1.5
+    }
+    
+    //MARK: Helpers Functions
+    func loadAudioBasicDescription(for url: URL) async throws -> AudioStreamBasicDescription {
+          let loadOptions = [AVURLAssetPreferPreciseDurationAndTimingKey: true]
+          let asset = AVURLAsset(url: url, options: loadOptions)
+
+          guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
+              throw AudioParserError.noAudioTrack
+          }
+
+          guard let asbd = try await track.load(.formatDescriptions).first?.audioFormatList.first?.mASBD else {
+              throw AudioParserError.malformedMetadata
+          }
+
+          return asbd
+      }
+
+    
+    func timecodeFromTimeReference(samples: Int64, sampleRate: Double, frameRate: Double) -> String {
+        // Convert samples to seconds
+        let seconds = Double(samples) / sampleRate
+        
+        // Convert seconds to timecode components
+        let totalFrames = Int64(seconds * frameRate)
+        let frames = totalFrames % Int64(frameRate)
+        let secondsTotal = totalFrames / Int64(frameRate)
+        let secs = secondsTotal % 60
+        let mins = (secondsTotal / 60) % 60
+        let hours = secondsTotal / 3600
+        
+        return String(format: "%02d:%02d:%02d:%02d", hours, mins, secs, frames)
+    }
+
+    
+    func audioFormatFromCodingHistory(_ codingHistory: String) -> String {
+        if codingHistory.isEmpty { return "Unknown" }
+        var algorithm: String = ""
+        var sampleRate: String = ""
+        var bitDepth: String = ""
+        let lines = codingHistory.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ",")
+        for line in lines {
+            let splitedLine = line.split(separator: "=")
+            switch line.first {
+            case "A":
+                algorithm = String(splitedLine[1])
+                break
+            case "F":
+                sampleRate = String(splitedLine[1])
+                break
+            case "W":
+                bitDepth = String(splitedLine[1])
+                break
+            default:
+                break
+            }
+        }
+        
+        let result: String = "\(bitDepth)bits \(sampleRate)Hz \(algorithm)"
+        return result
+    }
+                
 }
+
