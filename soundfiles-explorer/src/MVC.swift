@@ -63,8 +63,78 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
         tableView.dataSource = self
         tableView.registerForDraggedTypes([.fileURL])
         tableView.allowsMultipleSelection = false
-        let descriptor = NSSortDescriptor(key: "scene", ascending: true, selector: #selector(NSString.localizedStandardCompare(_:)))
-        tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("scene"))?.sortDescriptorPrototype = descriptor
+        
+        // SORT DESCRIPTORS
+        let fileNameSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.fileName.rawValue,
+                                                    ascending: true,
+                                                    selector: #selector(NSString.localizedStandardCompare(_:)))
+        if let fileNameColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.fileName.rawValue)) {
+            fileNameColumn.sortDescriptorPrototype = fileNameSortDescriptor
+        }
+        
+        let sceneSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.scene.rawValue,
+                                                   ascending: true,
+                                                   selector: #selector(NSString.localizedStandardCompare(_:)))
+        if let sceneColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.scene.rawValue)) {
+            sceneColumn.sortDescriptorPrototype = sceneSortDescriptor
+        }
+                
+        let takeSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.take.rawValue,
+                                                  ascending: true,
+                                                  selector: #selector(NSString.localizedStandardCompare(_:)))
+        if let takeColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.take.rawValue)) {
+            takeColumn.sortDescriptorPrototype = takeSortDescriptor
+        }
+        
+        let takeTypeSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.takeType.rawValue,
+                                                  ascending: true,
+                                                  selector: #selector(NSString.localizedStandardCompare(_:)))
+        if let takeTypeColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.takeType.rawValue)) {
+            takeTypeColumn.sortDescriptorPrototype = takeTypeSortDescriptor
+        }
+        
+        let tapeSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.tape.rawValue,
+                                                  ascending: true,
+                                                  selector: #selector(NSString.localizedStandardCompare(_:)))
+        if let takeTypeColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.tape.rawValue)) {
+            takeTypeColumn.sortDescriptorPrototype = tapeSortDescriptor
+        }
+        
+        let timeCodeStartSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.timeCodeStart.rawValue,
+                                                  ascending: true,
+                                                  selector: #selector(NSString.localizedStandardCompare(_:)))
+        if let timeCodeStartColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.timeCodeStart.rawValue)) {
+            timeCodeStartColumn.sortDescriptorPrototype = timeCodeStartSortDescriptor
+        }
+        
+        let channelsSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.channels.rawValue,
+                                                  ascending: true,
+                                                  selector: #selector(NSString.localizedStandardCompare(_:)))
+        if let channelsColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.channels.rawValue)) {
+            channelsColumn.sortDescriptorPrototype = channelsSortDescriptor
+        }
+        
+        let circledSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.circled.rawValue,
+                                                  ascending: true,
+                                                  selector: #selector(NSString.localizedStandardCompare(_:)))
+        if let circledColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.circled.rawValue)) {
+            circledColumn.sortDescriptorPrototype = circledSortDescriptor
+        }
+        
+        let dateSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.date.rawValue,
+                                                  ascending: true,
+                                                  selector: #selector(NSString.localizedStandardCompare(_:)))
+        if let dateColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.date.rawValue)) {
+            dateColumn.sortDescriptorPrototype = dateSortDescriptor
+        }
+        
+        let timeSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.time.rawValue,
+                                                  ascending: true,
+                                                  selector: #selector(NSString.localizedStandardCompare(_:)))
+        if let timeColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.time.rawValue)) {
+            timeColumn.sortDescriptorPrototype = timeSortDescriptor
+        }
+
     }
     
     private func setupPlayer() {
@@ -247,9 +317,9 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
 
     
     func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
-        let mutableArray = NSMutableArray(array: audioFiles)
-        mutableArray.sort(using: tableView.sortDescriptors)
-        audioFiles = mutableArray as! [AudioFile]
+        let sortedArray = NSMutableArray(array: audioFiles)
+        sortedArray.sort(using: tableView.sortDescriptors)
+        audioFiles = sortedArray as! [AudioFile]
         tableView.reloadData()
     }
 
