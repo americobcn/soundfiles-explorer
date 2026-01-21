@@ -9,14 +9,29 @@ import Cocoa
 import AVKit
 
 
-private struct AudioFile {
-    let name: String
+private class AudioFile: NSObject {
+    @objc let fileName: String
+    @objc var scene: String
+    @objc var take: String
     let url: URL
     let chCount: Int
     let bitDepth: Int
     let sampleRate: Float
     let bext: BEXTMetadata?
     let ixml: IXMLMetadata?
+    
+    init(fileName: String, scene: String = "", take: String = "", url: URL, chCount: Int, bitDepth: Int, sampleRate: Float, bext: BEXTMetadata?, ixml: IXMLMetadata?) {
+        self.fileName = fileName
+        self.scene = scene
+        self.take = take
+        self.url = url
+        self.chCount = chCount
+        self.bitDepth = bitDepth
+        self.sampleRate = sampleRate
+        self.bext = bext
+        self.ixml = ixml
+        super.init()
+    }
 }
 
 enum TableColumnIdentifiers: String, CaseIterable {
@@ -86,55 +101,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
             takeColumn.sortDescriptorPrototype = takeSortDescriptor
         }
         
-        let takeTypeSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.takeType.rawValue,
-                                                  ascending: true,
-                                                  selector: #selector(NSString.localizedStandardCompare(_:)))
-        if let takeTypeColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.takeType.rawValue)) {
-            takeTypeColumn.sortDescriptorPrototype = takeTypeSortDescriptor
-        }
-        
-        let tapeSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.tape.rawValue,
-                                                  ascending: true,
-                                                  selector: #selector(NSString.localizedStandardCompare(_:)))
-        if let takeTypeColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.tape.rawValue)) {
-            takeTypeColumn.sortDescriptorPrototype = tapeSortDescriptor
-        }
-        
-        let timeCodeStartSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.timeCodeStart.rawValue,
-                                                  ascending: true,
-                                                  selector: #selector(NSString.localizedStandardCompare(_:)))
-        if let timeCodeStartColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.timeCodeStart.rawValue)) {
-            timeCodeStartColumn.sortDescriptorPrototype = timeCodeStartSortDescriptor
-        }
-        
-        let channelsSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.channels.rawValue,
-                                                  ascending: true,
-                                                  selector: #selector(NSString.localizedStandardCompare(_:)))
-        if let channelsColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.channels.rawValue)) {
-            channelsColumn.sortDescriptorPrototype = channelsSortDescriptor
-        }
-        
-        let circledSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.circled.rawValue,
-                                                  ascending: true,
-                                                  selector: #selector(NSString.localizedStandardCompare(_:)))
-        if let circledColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.circled.rawValue)) {
-            circledColumn.sortDescriptorPrototype = circledSortDescriptor
-        }
-        
-        let dateSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.date.rawValue,
-                                                  ascending: true,
-                                                  selector: #selector(NSString.localizedStandardCompare(_:)))
-        if let dateColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.date.rawValue)) {
-            dateColumn.sortDescriptorPrototype = dateSortDescriptor
-        }
-        
-        let timeSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.time.rawValue,
-                                                  ascending: true,
-                                                  selector: #selector(NSString.localizedStandardCompare(_:)))
-        if let timeColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.time.rawValue)) {
-            timeColumn.sortDescriptorPrototype = timeSortDescriptor
-        }
-
     }
     
     private func setupPlayer() {
@@ -157,7 +123,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
         case .fileName:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].name)"
+            viewCell.textField!.stringValue = "\(audioFiles[row].fileName)"
             return viewCell
         case .scene:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
@@ -198,7 +164,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
         case .timeCodeRate:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].ixml?.parsedData["DISPLAYED_TC_FPS"] ?? "") \(audioFiles[row].ixml?.parsedData["TIMECODE_FLAG"] ?? "")"
+            let tcr = evaluateTimeCodeRate(expressionString: audioFiles[row].ixml!.parsedData["TIMECODE_RATE"]!)
+            viewCell.textField!.stringValue = "\(tcr) \(audioFiles[row].ixml?.parsedData["TIMECODE_FLAG"] ?? "")"
             return viewCell
         case .channels:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
@@ -246,8 +213,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
             
             #if DEBUG
             print("\nFILE DESCRIPTION START")
-            print("BEXT: \(audioFiles[selectedRow].bext)\n")
-            print("iXML(parsedData): \(audioFiles[selectedRow].ixml?.parsedData)")
+            print("BEXT: \(String(describing: audioFiles[selectedRow].bext))\n")
+            print("iXML(parsedData): \(String(describing: audioFiles[selectedRow].ixml?.parsedData))")
             print("iXML(rawData): \(audioFiles[selectedRow].ixml?.rawXML ?? "")")
             print("FILE DESCRIPTION END\n")
             #endif
@@ -285,13 +252,19 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
                         
                         Task {
                             let asbd = try await loadAudioBasicDescription(for: url)
-                            let audioFile = AudioFile(name: url.deletingPathExtension().lastPathComponent,
+                            let audioFile = AudioFile(fileName: url.deletingPathExtension().lastPathComponent,
                                                       url: url,
                                                       chCount: Int(asbd.mChannelsPerFrame),
                                                       bitDepth: Int(asbd.mBitsPerChannel),
                                                       sampleRate: Float(asbd.mSampleRate),
                                                       bext: data.bext,
                                                       ixml: data.ixml)
+                            if let sc = audioFile.ixml?.scene {
+                                audioFile.scene = sc
+                            }
+                            if let take = audioFile.ixml?.take {
+                                audioFile.take = take
+                            }
                             self.audioFiles.append(audioFile)
                             await MainActor.run {
                                     tableView.reloadData()
@@ -421,6 +394,74 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
         let result: String = "\(bitDepth)bits \(sampleRate)Hz \(algorithm)"
         return result
     }
-                
+    
+    func evaluateTimeCodeRate(expressionString: String) -> String {
+        // Replace integers with floating-point literals (e.g., "25" → "25.0")
+        let formattedString = expressionString
+            .replacingOccurrences(of: "\\b\\d+\\b", with: "$0.0", options: .regularExpression)
+        
+        let expression = NSExpression(format: formattedString)
+        if let result = expression.expressionValue(with: nil, context: nil) as? Float {
+            return String(format: "%.10g", result) // Avoid trailing zeros
+        } else {
+            return "Error"
+        }
+    }
 }
 
+
+
+/*
+ // SORT DESCRIPTORS UNUSED
+ 
+ let takeTypeSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.takeType.rawValue,
+                                           ascending: true,
+                                           selector: #selector(NSString.localizedStandardCompare(_:)))
+ if let takeTypeColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.takeType.rawValue)) {
+     takeTypeColumn.sortDescriptorPrototype = takeTypeSortDescriptor
+ }
+ 
+ let tapeSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.tape.rawValue,
+                                           ascending: true,
+                                           selector: #selector(NSString.localizedStandardCompare(_:)))
+ if let takeTypeColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.tape.rawValue)) {
+     takeTypeColumn.sortDescriptorPrototype = tapeSortDescriptor
+ }
+ 
+ let timeCodeStartSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.timeCodeStart.rawValue,
+                                           ascending: true,
+                                           selector: #selector(NSString.localizedStandardCompare(_:)))
+ if let timeCodeStartColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.timeCodeStart.rawValue)) {
+     timeCodeStartColumn.sortDescriptorPrototype = timeCodeStartSortDescriptor
+ }
+ 
+ let channelsSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.channels.rawValue,
+                                           ascending: true,
+                                           selector: #selector(NSString.localizedStandardCompare(_:)))
+ if let channelsColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.channels.rawValue)) {
+     channelsColumn.sortDescriptorPrototype = channelsSortDescriptor
+ }
+ 
+ let circledSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.circled.rawValue,
+                                           ascending: true,
+                                           selector: #selector(NSString.localizedStandardCompare(_:)))
+ if let circledColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.circled.rawValue)) {
+     circledColumn.sortDescriptorPrototype = circledSortDescriptor
+ }
+ 
+ let dateSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.date.rawValue,
+                                           ascending: true,
+                                           selector: #selector(NSString.localizedStandardCompare(_:)))
+ if let dateColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.date.rawValue)) {
+     dateColumn.sortDescriptorPrototype = dateSortDescriptor
+ }
+ 
+ let timeSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.time.rawValue,
+                                           ascending: true,
+                                           selector: #selector(NSString.localizedStandardCompare(_:)))
+ if let timeColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.time.rawValue)) {
+     timeColumn.sortDescriptorPrototype = timeSortDescriptor
+ }
+ 
+ 
+ */
