@@ -63,6 +63,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
         tableView.dataSource = self
         tableView.registerForDraggedTypes([.fileURL])
         tableView.allowsMultipleSelection = false
+        let descriptor = NSSortDescriptor(key: "scene", ascending: true, selector: #selector(NSString.localizedStandardCompare(_:)))
+        tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("scene"))?.sortDescriptorPrototype = descriptor
     }
     
     private func setupPlayer() {
@@ -112,10 +114,11 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
             else { return nil }
             var TCStart: String = ""
             if let bext = audioFiles[row].bext, let ixml = audioFiles[row].ixml {
-                if let sr = ixml.parsedData["TIMESTAMP_SAMPLE_RATE"],  let tcr = ixml.parsedData["DISPLAYED_TC_FPS"] {
+                if let sr = ixml.parsedData["TIMESTAMP_SAMPLE_RATE"],  let tcr = ixml.parsedData["TIMECODE_RATE"] { //let tcr = ixml.parsedData["DISPLAYED_TC_FPS"]
+                    let splitedTCR = tcr.split(separator: "/")
                     TCStart = timecodeFromTimeReference(samples: Int64(bext.timeReferenceSamples),
                                                         sampleRate: Double(sr)!,
-                                                        frameRate: Double(tcr)!
+                                                        frameRate: Double(splitedTCR[0])!
                     )
                 }
             }
@@ -173,8 +176,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
             
             #if DEBUG
             print("\nFILE DESCRIPTION START")
-            print("BEXT: \(audioFiles[selectedRow].bext, default: "nil")\n")
-            print("iXML(parsedData): \(audioFiles[selectedRow].ixml?.parsedData, default: "")")
+            print("BEXT: \(audioFiles[selectedRow].bext)\n")
+            print("iXML(parsedData): \(audioFiles[selectedRow].ixml?.parsedData)")
             print("iXML(rawData): \(audioFiles[selectedRow].ixml?.rawXML ?? "")")
             print("FILE DESCRIPTION END\n")
             #endif
@@ -242,6 +245,16 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
         return false
     }
 
+    
+    func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
+        let mutableArray = NSMutableArray(array: audioFiles)
+        mutableArray.sort(using: tableView.sortDescriptors)
+        audioFiles = mutableArray as! [AudioFile]
+        tableView.reloadData()
+    }
+
+    
+    
     // MARK: Keyboard event handlers
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
