@@ -77,7 +77,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
         tableView.delegate = self
         tableView.dataSource = self
         tableView.registerForDraggedTypes([.fileURL])
-        tableView.allowsMultipleSelection = false
+        tableView.allowsMultipleSelection = true
+        tableView.setDraggingSourceOperationMask(.copy, forLocal: false)
         
         // SORT DESCRIPTORS
         let fileNameSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.fileName.rawValue,
@@ -227,11 +228,21 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
                    proposedRow row: Int,
                    proposedDropOperation dropOperation: NSTableView.DropOperation) -> NSDragOperation
     {
-        if info.draggingPasteboard.types?.contains(.fileURL) == true {
+        if info.draggingSource as? NSTableView == tableView {
+            // Internal move (row reordering)
+            tableView.setDropRow(row, dropOperation: .above)
+            return .move
+        } else if info.draggingPasteboard.types?.contains(.fileURL) == true {
             // File Drop (from Finder)
             tableView.setDropRow(row, dropOperation: .above)
             return .copy
         }
+        
+        // if info.draggingPasteboard.types?.contains(.fileURL) == true {
+        //     // File Drop (from Finder)
+        //     tableView.setDropRow(row, dropOperation: .above)
+        //     return .copy
+        // }
         return []
     }
     
@@ -297,7 +308,13 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
     }
 
     
+    func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting?
+    {
+        return audioFiles[row].url as NSURL
+    }
     
+        
+
     // MARK: Keyboard event handlers
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
