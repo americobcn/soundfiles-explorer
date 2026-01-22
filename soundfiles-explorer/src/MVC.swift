@@ -16,11 +16,11 @@ private class AudioFile: NSObject {
     let url: URL
     let chCount: Int
     let bitDepth: Int
-    let sampleRate: Float
+    let sampleRate: Int
     let bext: BEXTMetadata?
     let ixml: IXMLMetadata?
     
-    init(fileName: String, scene: String = "", take: String = "", url: URL, chCount: Int, bitDepth: Int, sampleRate: Float, bext: BEXTMetadata?, ixml: IXMLMetadata?) {
+    init(fileName: String, scene: String = "", take: String = "", url: URL, chCount: Int, bitDepth: Int, sampleRate: Int, bext: BEXTMetadata?, ixml: IXMLMetadata?) {
         self.fileName = fileName
         self.scene = scene
         self.take = take
@@ -50,7 +50,7 @@ enum TableColumnIdentifiers: String, CaseIterable {
 }
 
 
-class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
+class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearchFieldDelegate {
     //MARK: Outlets
     @IBOutlet weak var tableView: NSTableView!
     @IBOutlet weak var searchField: NSSearchField!
@@ -59,6 +59,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
     //MARK: Variables
     private var player: AVPlayer!
     private var audioFiles: [AudioFile] = []
+    private var backupAudioFiles: [AudioFile] = []
     private var notLoadedFiles: [String] = []
     private let metadataReader = AudioMetadataReader()
     
@@ -71,6 +72,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
         super.viewDidLoad()
         setupTableView()
         setupPlayer()
+        searchField.delegate = self
     }
     
     private func setupTableView() {
@@ -111,6 +113,55 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
     }
     
     
+    func controlTextDidChange(_ obj: Notification) {
+        guard obj.object as? NSSearchField == searchField else { return }
+        if searchField.stringValue.isEmpty {
+            audioFiles = backupAudioFiles
+            tableView.reloadData()
+        } else {
+            audioFiles = audioFiles.filter { $0.scene.localizedCaseInsensitiveContains(searchField.stringValue) }
+            tableView.reloadData()
+        }
+        
+        //let searchString = searchField.stringValue
+        //if searchString.isEmpty {
+        //    filteredAudioFiles = audioFiles
+        //    } else {
+        //        // let placeholder = (searchField.cell as? NSSearchFieldCell)?.placeholderString ?? "All"
+        //        var predicate: NSPredicate
+        //        predicate = NSPredicate(format: "scene contains %@", searchString)
+        //        // switch placeholder {
+        //        // case "First Name":
+        //        //     predicate = NSPredicate(format: "firstName contains %@", searchString)
+        //        // case "Last Name":
+        //        //     predicate = NSPredicate(format: "lastName contains %@", searchString)
+        //        // default:
+        //        //     predicate = NSPredicate(format: "firstName contains %@ OR lastName contains %@", searchString, searchString)
+        //        // }
+
+        //        audioFiles = (filteredAudioFiles as NSArray).filtered(using: predicate) as! [AudioFile]
+        //    }
+        // tableView.reloadData()
+    }
+    
+
+    private func deleteSelectedRows() {
+        let selectedIndexes = tableView.selectedRowIndexes
+        // Ensure there is something to delete
+        guard !selectedIndexes.isEmpty else { return }
+        
+        // Convert to an array and delete items from the data source
+        let indexesToRemove = selectedIndexes.sorted(by: >) // Sort in descending order
+        print(indexesToRemove)
+        for index in indexesToRemove {
+            audioFiles.remove(at: index)
+        }
+        
+        let selectRow = indexesToRemove.endIndex - 1
+        tableView.removeRows(at: selectedIndexes, withAnimation: .effectFade)
+        tableView.selectRowIndexes(IndexSet([selectRow]), byExtendingSelection: false)
+    }
+
     
     //MARK: NSTableViewDataSource methods
     func numberOfRows(in tableView: NSTableView) -> Int {
@@ -198,7 +249,13 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
             return nil
         }
     }
-
+    
+    func tableView(_ tableView: NSTableView, draggingSession session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+        if operation == .copy {
+            print("Copy audioFiles to backp")
+            backupAudioFiles.append(contentsOf: audioFiles)
+        }
+    }
     
     // MARK:  TableView Delegate Methods
     func tableViewSelectionDidChange(_ notification: Notification) {
@@ -237,20 +294,37 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
             tableView.setDropRow(row, dropOperation: .above)
             return .copy
         }
-        
-        // if info.draggingPasteboard.types?.contains(.fileURL) == true {
-        //     // File Drop (from Finder)
-        //     tableView.setDropRow(row, dropOperation: .above)
-        //     return .copy
-        // }
+                
         return []
     }
     
     
         
-    func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation) -> Bool
+    func tableView(_ tableView: NSTableView,
+                   acceptDrop info: NSDraggingInfo,
+                   row: Int,
+                   dropOperation: NSTableView.DropOperation) -> Bool
     {
-        if info.draggingPasteboard.types?.contains(.fileURL) == true {
+        // Moved row on tableview
+        if info.draggingSource as? NSTableView == tableView {
+            guard let sourceRow = tableView.selectedRowIndexes.first else {
+                return false
+            }
+            
+            guard sourceRow != row else {
+                return false
+            } // Prevent dropping onto the same row
+            
+            let draggedItem = audioFiles[sourceRow]
+            audioFiles.remove(at: sourceRow)
+            
+            // Adjust the destination index when dragging downwards
+            let adjustedIndex = row > sourceRow ? row - 1 : row
+            audioFiles.insert(draggedItem, at: adjustedIndex)
+            tableView.moveRow(at: sourceRow, to: adjustedIndex)
+            return true
+        // Dragged files from finder
+        } else if info.draggingPasteboard.types?.contains(.fileURL) == true {
             guard let pasteboardObjects = info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: nil),
                   pasteboardObjects.count > 0 else {
                 return false
@@ -260,14 +334,13 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
                 if let url = object as? URL {
                     do {
                         let data = try metadataReader.readAudioMetadata(from: url)
-                        
                         Task {
                             let asbd = try await loadAudioBasicDescription(for: url)
                             let audioFile = AudioFile(fileName: url.deletingPathExtension().lastPathComponent,
                                                       url: url,
                                                       chCount: Int(asbd.mChannelsPerFrame),
                                                       bitDepth: Int(asbd.mBitsPerChannel),
-                                                      sampleRate: Float(asbd.mSampleRate),
+                                                      sampleRate: Int(asbd.mSampleRate),
                                                       bext: data.bext,
                                                       ixml: data.ixml)
                             if let sc = audioFile.ixml?.scene {
@@ -281,19 +354,18 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
                                     tableView.reloadData()
                             }
                         }
-                        
                     } catch {
                         self.notLoadedFiles.append(url.lastPathComponent)
                     }
                 }
             }
+                        
             if notLoadedFiles.count > 0 {
                 let alert = NSAlert()
                 alert.messageText = "Some files could not be loaded."
                 alert.informativeText = notLoadedFiles.joined(separator: ", ")
                 alert.runModal()
             }
-            
             return true
         }
         return false
@@ -312,12 +384,14 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
     {
         return audioFiles[row].url as NSURL
     }
-    
         
 
     // MARK: Keyboard event handlers
     override func keyDown(with event: NSEvent) {
+        print(event)
         switch event.keyCode {
+        case 51, 117:
+            deleteSelectedRows()
         case 49: // Space Bar
             playPause()
             break
@@ -335,7 +409,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
         }
     }
     
-        
+    
     private func playPause() {
         if playerView.player?.rate == 0.0  {
             playerView.player?.play()
@@ -351,6 +425,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
     private func playForward() {
         playerView.player?.rate = playerView.player!.rate + 1.5
     }
+    
     
     //MARK: Helpers Functions
     func loadAudioBasicDescription(for url: URL) async throws -> AudioStreamBasicDescription {
@@ -412,6 +487,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
         return result
     }
     
+    
     func evaluateTimeCodeRate(expressionString: String) -> String {
         // Replace integers with floating-point literals (e.g., "25" → "25.0")
         let formattedString = expressionString
@@ -424,6 +500,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource {
             return "Error"
         }
     }
+    
 }
 
 
