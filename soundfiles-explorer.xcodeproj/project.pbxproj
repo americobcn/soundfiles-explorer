@@ -6,8 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		DA3A12D72F277BED00D985DF /* AVKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DA3A12D52F277BE700D985DF /* AVKit.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		1E9D5CC52F1EDEAC00A0BE9E /* soundfiles-explorer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "soundfiles-explorer.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		DA3A12D52F277BE700D985DF /* AVKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVKit.framework; path = System/Library/Frameworks/AVKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -23,6 +28,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DA3A12D72F277BED00D985DF /* AVKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -33,6 +39,7 @@
 			isa = PBXGroup;
 			children = (
 				1E9D5CC72F1EDEAC00A0BE9E /* soundfiles-explorer */,
+				DA3A12D42F277BE700D985DF /* Frameworks */,
 				1E9D5CC62F1EDEAC00A0BE9E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -43,6 +50,14 @@
 				1E9D5CC52F1EDEAC00A0BE9E /* soundfiles-explorer.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		DA3A12D42F277BE700D985DF /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				DA3A12D52F277BE700D985DF /* AVKit.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
