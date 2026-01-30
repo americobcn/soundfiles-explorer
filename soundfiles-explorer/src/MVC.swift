@@ -6,8 +6,8 @@
 //
 
 import Cocoa
+import AVFoundation
 import AVKit
-
 
 private class AudioFile: NSObject {
     @objc let fileName: String
@@ -62,21 +62,30 @@ enum TableColumnIdentifiers: String, CaseIterable {
 
 
 class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearchFieldDelegate {
+    
     //MARK: Outlets
     @IBOutlet weak var tableView: NSTableView!
     @IBOutlet weak var searchField: NSSearchField!
     @IBOutlet weak var playerView: AVPlayerView!
+    @IBOutlet weak var waveformView: AudioWaveformView!
     
     //MARK: Variables
     private var player: AVPlayer!
+    private var waveformPlayer: AVPlayer!
     private var audioFiles: [AudioFile] = []
     private var backupAudioFiles: [AudioFile] = []
     private var notLoadedFiles: [String] = []
     private let metadataReader = AudioMetadataReader()
     
+    
+    // Controllers
+    // private var awvc: AudioWaveformViewController!
+    
+    
     //MARK: Methods
     required init?(coder: NSCoder) {
         super.init(coder: coder)
+        
     }
     
     override func viewDidLoad() {
@@ -128,6 +137,26 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         self.player = AVPlayer()
         self.playerView.player = self.player
         self.playerView.controlsStyle = .inline
+                
+        // self.awvc = AudioWaveformViewController()
+        // print("MVC awvc after: \(String(describing: awvc))")
+        
+        // AudioWaveformViewGPT(frame: playerView.bounds)
+        // self.waveformView = AudioWaveformViewGPT()
+        
+        // Waveform View
+        // self.waveformPlayer = AVPlayer()
+
+        // self.waveformView.translatesAutoresizingMaskIntoConstraints = false
+        // self.waveformView.waveformColors = [
+        //     .systemBlue,
+        //     .systemRed,
+        //     .systemGreen,
+        //     .systemYellow
+        // ]
+        // Add to scroll view
+        // let scrollView = NSScrollView()
+        // scrollView.documentView = waveformView
     }
     
     
@@ -274,6 +303,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         }
     }
     
+    
     // MARK:  TableView Delegate Methods
     func tableViewSelectionDidChange(_ notification: Notification) {
         let tableView = notification.object as! NSTableView
@@ -285,6 +315,10 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             
             let playerItem = AVPlayerItem(url: audioFiles[selectedRow].url)
             self.player.replaceCurrentItem(with: playerItem)
+            waveformView.audioURL = audioFiles[selectedRow].url
+            // self.awvc.loadAudioFile(audioFiles[selectedRow].url)
+            // audioWaveformViewControllerDelegate?.audioURLDidChange(audioFiles[selectedRow].url)
+            
             
             #if DEBUG
             // print("\nFILE DESCRIPTION START")
@@ -527,6 +561,12 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             // return default values
             return "00:00:00:00"
         }
+    }
+    
+    
+    //MARK: AudioWaveformViewControllerDelegate method
+    func audioURLDidChange(_ url: URL) {
+        
     }
     
 }
