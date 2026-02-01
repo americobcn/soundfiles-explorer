@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="23504" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="24506" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
     <dependencies>
         <deployment identifier="macosx"/>
-        <plugIn identifier="com.apple.AVKitIBPlugin" version="23504"/>
-        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="23504"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="24506"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <objects>
@@ -22,11 +21,10 @@
         <customObject id="YLy-65-1bz" customClass="NSFontManager"/>
         <viewController id="Pyh-zz-uSb" customClass="MVC" customModule="soundfiles_explorer" customModuleProvider="target">
             <connections>
-                <outlet property="playerView" destination="kUQ-1H-CRw" id="cTi-Az-fjA"/>
                 <outlet property="searchField" destination="1bJ-2h-6wJ" id="vhA-H1-Vdm"/>
                 <outlet property="tableView" destination="JGO-3D-JlZ" id="aJ1-j4-9xs"/>
                 <outlet property="view" destination="EiT-Mj-1SZ" id="JoO-fj-g1b"/>
-                <outlet property="waveformView" destination="kjg-HW-iyx" id="0hs-Md-2LM"/>
+                <outlet property="waveformViewPlayer" destination="kjg-HW-iyx" id="bDv-B1-IDP"/>
             </connections>
         </viewController>
         <viewController id="Uz9-bu-SFv" customClass="AudioWaveformViewController" customModule="soundfiles_explorer" customModuleProvider="target"/>
@@ -695,38 +693,25 @@
         <window title="soundfiles-explorer" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" releasedWhenClosed="NO" animationBehavior="default" id="QvC-M9-y7g">
             <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES" resizable="YES"/>
             <windowPositionMask key="initialPositionMask" leftStrut="YES" rightStrut="YES" topStrut="YES" bottomStrut="YES"/>
-            <rect key="contentRect" x="335" y="390" width="1900" height="1060"/>
-            <rect key="screenRect" x="0.0" y="0.0" width="2304" height="1271"/>
+            <rect key="contentRect" x="335" y="390" width="1920" height="1060"/>
+            <rect key="screenRect" x="0.0" y="0.0" width="1920" height="1055"/>
             <view key="contentView" id="EiT-Mj-1SZ">
-                <rect key="frame" x="0.0" y="0.0" width="1900" height="1060"/>
+                <rect key="frame" x="0.0" y="0.0" width="1920" height="1060"/>
                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                 <subviews>
-                    <avPlayerView fixedFrame="YES" controlsStyle="inline" translatesAutoresizingMaskIntoConstraints="NO" id="kUQ-1H-CRw">
-                        <rect key="frame" x="20" y="965" width="1860" height="75"/>
-                        <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
-                    </avPlayerView>
-                    <searchField wantsLayer="YES" focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" textCompletion="NO" translatesAutoresizingMaskIntoConstraints="NO" id="1bJ-2h-6wJ">
-                        <rect key="frame" x="20" y="935" width="1860" height="22"/>
-                        <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
-                        <searchFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" borderStyle="bezel" usesSingleLineMode="YES" bezelStyle="round" id="tJv-GR-OuA">
-                            <font key="font" metaFont="system"/>
-                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
-                            <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
-                        </searchFieldCell>
-                    </searchField>
-                    <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="kjg-HW-iyx" customClass="AudioWaveformView" customModule="soundfiles_explorer" customModuleProvider="target">
-                        <rect key="frame" x="20" y="601" width="1860" height="326"/>
+                    <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="kjg-HW-iyx">
+                        <rect key="frame" x="20" y="631" width="1880" height="409"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                     </customView>
                     <scrollView fixedFrame="YES" autohidesScrollers="YES" horizontalLineScroll="17" horizontalPageScroll="10" verticalLineScroll="17" verticalPageScroll="10" usesPredominantAxisScrolling="NO" translatesAutoresizingMaskIntoConstraints="NO" id="jUU-Hf-uwt">
-                        <rect key="frame" x="20" y="20" width="1860" height="573"/>
+                        <rect key="frame" x="20" y="20" width="1880" height="573"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxY="YES"/>
                         <clipView key="contentView" id="LCc-ZB-2MM">
-                            <rect key="frame" x="1" y="1" width="1858" height="571"/>
+                            <rect key="frame" x="1" y="1" width="1878" height="571"/>
                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                             <subviews>
                                 <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" autosaveColumns="NO" rowSizeStyle="automatic" headerView="rAR-Vo-4jF" viewBased="YES" id="JGO-3D-JlZ">
-                                    <rect key="frame" x="0.0" y="0.0" width="1858" height="543"/>
+                                    <rect key="frame" x="0.0" y="0.0" width="1878" height="543"/>
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                     <size key="intercellSpacing" width="17" height="0.0"/>
                                     <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -1087,7 +1072,7 @@
                                                 </tableCellView>
                                             </prototypeCellViews>
                                         </tableColumn>
-                                        <tableColumn identifier="audioDescription" editable="NO" width="527" minWidth="10" maxWidth="3.4028234663852886e+38" id="eAc-6P-rTx">
+                                        <tableColumn identifier="audioDescription" editable="NO" width="547" minWidth="10" maxWidth="3.4028234663852886e+38" id="eAc-6P-rTx">
                                             <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" title="Audio Description">
                                                 <color key="textColor" name="headerTextColor" catalog="System" colorSpace="catalog"/>
                                                 <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
@@ -1100,11 +1085,11 @@
                                             <tableColumnResizingMask key="resizingMask" resizeWithTable="YES" userResizable="YES"/>
                                             <prototypeCellViews>
                                                 <tableCellView id="96S-Mh-ccF">
-                                                    <rect key="frame" x="1325" y="0.0" width="524" height="17"/>
+                                                    <rect key="frame" x="1325" y="0.0" width="544" height="17"/>
                                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                     <subviews>
                                                         <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="ahM-OL-oNg">
-                                                            <rect key="frame" x="0.0" y="1" width="524" height="16"/>
+                                                            <rect key="frame" x="0.0" y="1" width="544" height="16"/>
                                                             <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
                                                             <textFieldCell key="cell" lineBreakMode="truncatingTail" sendsActionOnEndEditing="YES" title="Table View Cell" id="Ksi-Iu-AkX">
                                                                 <font key="font" usesAppearanceFont="YES"/>
@@ -1124,7 +1109,7 @@
                             </subviews>
                         </clipView>
                         <scroller key="horizontalScroller" hidden="YES" wantsLayer="YES" verticalHuggingPriority="750" horizontal="YES" id="xyT-iz-kfv">
-                            <rect key="frame" x="1" y="557" width="1520" height="15"/>
+                            <rect key="frame" x="1" y="557" width="1878" height="15"/>
                             <autoresizingMask key="autoresizingMask"/>
                         </scroller>
                         <scroller key="verticalScroller" hidden="YES" wantsLayer="YES" verticalHuggingPriority="750" horizontal="NO" id="6ZE-w7-6eX">
@@ -1132,10 +1117,19 @@
                             <autoresizingMask key="autoresizingMask"/>
                         </scroller>
                         <tableHeaderView key="headerView" identifier="tape" wantsLayer="YES" id="rAR-Vo-4jF">
-                            <rect key="frame" x="0.0" y="0.0" width="1858" height="28"/>
+                            <rect key="frame" x="0.0" y="0.0" width="1878" height="28"/>
                             <autoresizingMask key="autoresizingMask"/>
                         </tableHeaderView>
                     </scrollView>
+                    <searchField wantsLayer="YES" focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" textCompletion="NO" translatesAutoresizingMaskIntoConstraints="NO" id="1bJ-2h-6wJ">
+                        <rect key="frame" x="20" y="601" width="1880" height="22"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
+                        <searchFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" borderStyle="bezel" usesSingleLineMode="YES" bezelStyle="round" id="tJv-GR-OuA">
+                            <font key="font" metaFont="system"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                        </searchFieldCell>
+                    </searchField>
                 </subviews>
             </view>
             <connections>

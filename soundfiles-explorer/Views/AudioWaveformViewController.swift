@@ -158,8 +158,7 @@ class AudioWaveformViewController: NSViewController {
         }
     }
     
-    // MARK: - Actions
-    
+    // MARK: - Actions    
     @objc private func openFileAction() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.audio]
@@ -204,22 +203,10 @@ class AudioWaveformViewController: NSViewController {
     func loadAudioFile(_ url: URL) {
         audioURL = url
         
-        // Load into waveform view
-        // Create scroll view
-        // if scrollView == nil {
-        //     scrollView = NSScrollView(frame: view.bounds)
-        // }
-        //
-        // scrollView.autoresizingMask = [.width, .height]
-        // scrollView.hasHorizontalScroller = true
-        // scrollView.hasVerticalScroller = true
-        // scrollView.autohidesScrollers = false
-        // scrollView.backgroundColor = NSColor(calibratedWhite: 0.15, alpha: 1.0)
-        
         waveformView = AudioWaveformView(frame: view.bounds)
         view.addSubview(waveformView)
         waveformView.audioURL = url
-        // waveformView.updateContentSize()
+        
         
         // Setup audio player
         do {

@@ -48,10 +48,10 @@ class AudioWaveformView: NSView {
     var textColor: NSColor = .white
     
     /// Layout constants
-    private let rulerHeight: CGFloat = 30
-    private let channelSpacing: CGFloat = 10
-    private let channelLabelWidth: CGFloat = 120
-    private let minChannelHeight: CGFloat = 60
+    private let rulerHeight: CGFloat = 20
+    private let channelSpacing: CGFloat = 2
+    private let channelLabelWidth: CGFloat = 0
+    private let minChannelHeight: CGFloat = 40
     
     /// Zoom and scroll
     var pixelsPerSecond: CGFloat = 100 {
@@ -87,18 +87,17 @@ class AudioWaveformView: NSView {
     }
     
     // MARK: - Audio Loading
-    func audioURLDidChange(_ url: URL) {
-        self.audioURL = url
-    }
-    
     func loadAudioFile(_ url: URL) {
         do {
             audioFile = try AVAudioFile(forReading: url)
             
             guard let file = audioFile else {
+                let alert = NSAlert(error: NSError(domain: "Error", code: 0, userInfo: nil))
+                alert.runModal()
                 print("Failed to load audio file")
                 return
             }
+            
             let format = file.processingFormat
             
             audioFormat = format
@@ -120,13 +119,13 @@ class AudioWaveformView: NSView {
             
             // Generate waveforms
             generateWaveforms(from: file, channelCount: channelCount)
-            
             needsDisplay = true
             
         } catch {
             print("Error loading audio file: \(error)")
         }
     }
+    
     
     private func generateWaveforms(from file: AVAudioFile, channelCount: Int) {
         print("Generate Waveforms called")
@@ -186,12 +185,9 @@ class AudioWaveformView: NSView {
                 channelMaxValues[channel].append(currentMaxes[channel])
             }
         }
-        
         channelWaveforms = channelMaxValues
-        
-        
     }
-    
+
     // MARK: - Drawing
     
     override func draw(_ dirtyRect: NSRect) {
@@ -206,25 +202,22 @@ class AudioWaveformView: NSView {
         // Calculate layout
         let channelCount = channelWaveforms.count
         guard channelCount > 0 else {
-            print("No channels")
             drawEmptyState(in: context)
             return
         }
         
-        let waveformAreaHeight = bounds.height - rulerHeight
-        let channelHeight = (waveformAreaHeight - CGFloat(channelCount) * channelSpacing) / CGFloat(channelCount)
+        let waveformAreaHeight = bounds.height // - rulerHeight
+        let channelHeight = (waveformAreaHeight - CGFloat(channelCount + 1) * channelSpacing) / CGFloat(channelCount)
         let actualChannelHeight = max(channelHeight, minChannelHeight)
-        
-        // Draw time ruler
-        drawTimeRuler(in: context)
+                
         
         // Draw each channel
         for (index, waveform) in channelWaveforms.enumerated() {
-            let yPosition = rulerHeight + channelSpacing + CGFloat(index) * (actualChannelHeight + channelSpacing)
+            let yPosition = channelSpacing + CGFloat(index) * (actualChannelHeight + channelSpacing) //  - rulerHeight / 2
             let channelRect = NSRect(
                 x: 0, // channelLabelWidth,
                 y: yPosition,
-                width: bounds.width , // - channelLabelWidth
+                width: bounds.width , // - channelLabelWidth bounds.width getTotalWidth()
                 height: actualChannelHeight
             )
             
@@ -242,6 +235,7 @@ class AudioWaveformView: NSView {
         
         // Draw playback cursor
         drawPlaybackCursor(in: context)
+        updateContentSize()
     }
     
     private func drawEmptyState(in context: CGContext) {
@@ -262,7 +256,7 @@ class AudioWaveformView: NSView {
     }
     
     private func drawTimeRuler(in context: CGContext) {
-        let rulerRect = NSRect(x: 0, y: self.bounds.height, width: bounds.width , height: rulerHeight)
+        let rulerRect = NSRect(x: 0, y: self.bounds.height, width: bounds.width , height: rulerHeight) //
         
         // Draw ruler background
         NSColor(calibratedWhite: 0.2, alpha: 1.0).setFill()
@@ -328,7 +322,6 @@ class AudioWaveformView: NSView {
     
     
     private func drawWaveform(_ waveform: [Float], in rect: NSRect, color: NSColor, context: CGContext) {
-        print("drawWaveform called")
         guard !waveform.isEmpty else { return }
         
         let midY = rect.midY
@@ -372,6 +365,7 @@ class AudioWaveformView: NSView {
         context.strokePath()
         
         context.restoreGState()
+        
     }
     
     private func drawPlaybackCursor(in context: CGContext) {
@@ -435,9 +429,9 @@ class AudioWaveformView: NSView {
     
     /// Get the total width needed for the waveform
     func getTotalWidth() -> CGFloat {
-        return CGFloat(duration) * pixelsPerSecond + channelLabelWidth
+        return CGFloat(duration) * pixelsPerSecond // + channelLabelWidth
     }
-    
+        
     // MARK: - Mouse Interaction
     
     override func mouseDown(with event: NSEvent) {
@@ -458,6 +452,7 @@ class AudioWaveformView: NSView {
     }
 }
 
+
 // MARK: - Scroll View Integration
 
 extension AudioWaveformView {
@@ -466,14 +461,122 @@ extension AudioWaveformView {
     override var intrinsicContentSize: NSSize {
         let width = getTotalWidth()
         let channelCount = max(1, channelWaveforms.count)
-        let height = rulerHeight + CGFloat(channelCount) * (minChannelHeight + channelSpacing) + channelSpacing
+        let height = CGFloat(channelCount) * (minChannelHeight + channelSpacing) + channelSpacing // rulerHeight +
         return NSSize(width: width, height: max(200, height))
     }
     
     /// Call this when zoom changes to update the scroll view
-    func updateContentSize() {
-        print("Update Content view called")
+    func updateContentSize() {                
         invalidateIntrinsicContentSize()
         needsDisplay = true
     }
 }
+
+
+
+/*
+ /// AVAsset version
+ func generateWaveforms(from asset: AVAsset, channelCount: Int) {
+     print("Generate Waveforms called (AVAsset)")
+
+     guard let track = asset.tracks(withMediaType: .audio).first else {
+         print("No audio track found")
+         return
+     }
+
+     let durationSeconds = CMTimeGetSeconds(asset.duration)
+     guard durationSeconds > 0 else {
+         print("Invalid asset duration")
+         return
+     }
+
+     let desiredWaveformPoints = Int(durationSeconds * Double(pixelsPerSecond))
+     guard desiredWaveformPoints > 0 else { return }
+
+     channelWaveforms = Array(repeating: [], count: channelCount)
+     var channelMaxValues: [[Float]] = Array(repeating: [], count: channelCount)
+
+     let readerSettings: [String: Any] = [
+         AVFormatIDKey: kAudioFormatLinearPCM,
+         AVLinearPCMIsFloatKey: true,
+         AVLinearPCMBitDepthKey: 32,
+         AVLinearPCMIsNonInterleaved: true
+     ]
+
+     do {
+         let reader = try AVAssetReader(asset: asset)
+         let output = AVAssetReaderTrackOutput(track: track, outputSettings: readerSettings)
+         output.alwaysCopiesSampleData = false
+         reader.add(output)
+
+         reader.startReading()
+
+         var sampleCounter = 0
+         var currentMaxes = Array(repeating: Float(0), count: channelCount)
+
+         let sampleRate = track.naturalTimeScale > 0
+             ? Double(track.naturalTimeScale)
+             : 44_100
+
+         let totalSamplesEstimate = Int(durationSeconds * sampleRate)
+         let samplesPerPoint = max(1, totalSamplesEstimate / desiredWaveformPoints)
+
+         while reader.status == .reading {
+             guard let sampleBuffer = output.copyNextSampleBuffer(),
+                   let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer),
+                   let formatDesc = CMSampleBufferGetFormatDescription(sampleBuffer),
+                   let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(formatDesc)
+             else {
+                 continue
+             }
+
+             let frameCount = CMSampleBufferGetNumSamples(sampleBuffer)
+             let channels = Int(asbd.pointee.mChannelsPerFrame)
+
+             var dataPointer: UnsafeMutablePointer<Int8>?
+             var length = 0
+             CMBlockBufferGetDataPointer(blockBuffer, atOffset: 0, lengthAtOffsetOut: nil, totalLengthOut: &length, dataPointerOut: &dataPointer)
+
+             guard let rawPointer = dataPointer else { continue }
+
+             let floatPointer = UnsafeMutableRawPointer(rawPointer)
+                 .bindMemory(to: Float.self, capacity: frameCount * channels)
+
+
+             for frame in 0..<frameCount {
+                 for channel in 0..<min(channelCount, channels) {
+                     let sample = abs(floatPointer[channel * frameCount + frame])
+                     currentMaxes[channel] = max(currentMaxes[channel], sample)
+                 }
+
+                 sampleCounter += 1
+
+                 if sampleCounter >= samplesPerPoint {
+                     for channel in 0..<channelCount {
+                         channelMaxValues[channel].append(currentMaxes[channel])
+                     }
+                     currentMaxes = Array(repeating: 0, count: channelCount)
+                     sampleCounter = 0
+                 }
+             }
+
+             CMSampleBufferInvalidate(sampleBuffer)
+         }
+
+         // Flush remaining values
+         for channel in 0..<channelCount where currentMaxes[channel] > 0 {
+             channelMaxValues[channel].append(currentMaxes[channel])
+         }
+
+         channelWaveforms = channelMaxValues
+
+         if reader.status == .failed {
+             print("AVAssetReader failed: \(String(describing: reader.error))")
+         }
+
+     } catch {
+         print("Failed to create AVAssetReader: \(error)")
+     }
+     
+ }
+ */
