@@ -32,8 +32,12 @@ class AudioPlaybackManager: NSObject {
         }
     }
 
-    var duration: TimeInterval = 0
-    
+    // Basic Audio Info
+    var channelCount: Int = 0
+    var sampleRate: Double = 0
+    var bitsPerChannel: Int = 0
+    var duration: Float64 = 0
+        
     var rate: Float {
         get {
             guard let pl = player else { return 0 }
@@ -49,14 +53,16 @@ class AudioPlaybackManager: NSObject {
     // MARK: - Initialization
     override init() {
         super.init()
+        player = AVPlayer()
     }
 
 
     // MARK: - Public Methods
 
     /// Load an audio file for playback
-    func loadAudioFile(_ url: URL) {
-        let asset = AVAsset(url: url)
+    func loadAudioFile(_ url: URL) async {
+        let options = [AVURLAssetPreferPreciseDurationAndTimingKey: true]
+        let asset = AVURLAsset(url: url, options: options)
         let item = AVPlayerItem(asset: asset)
 
         // Remove previous observer if exists
@@ -65,14 +71,43 @@ class AudioPlaybackManager: NSObject {
             isObserving = false
         }
 
-        player = AVPlayer(playerItem: item)
-        duration = CMTimeGetSeconds(item.duration)
+        // player = AVPlayer(playerItem: item)
+        player?.replaceCurrentItem(with: item)
+        do {
+            let assetDuration = try await asset.load(.duration)
+            duration = CMTimeGetSeconds(assetDuration)
+            
+            
+            // Get channels count
+            let assetTracks = try await asset.load(.tracks)
+            let track = assetTracks.first(where: { $0.mediaType == .audio })!
+            
+             let formatDescriptions = try await track.load(.formatDescriptions)
+            guard let audioFormatDesc = formatDescriptions.first,
+            let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(audioFormatDesc)
+            else { return }
+            channelCount = Int(asbd.pointee.mChannelsPerFrame)
+            sampleRate = Double(asbd.pointee.mSampleRate)
+            bitsPerChannel = Int(asbd.pointee.mBitsPerChannel)
+            
+            print("AudioPlaybackManager: Loaded audio")
+            print("Duration: \(duration)")
+            print("Channel count: \(channelCount)")
+            print("SampleRate: \(sampleRate)")
+            print("Bits depth: \(bitsPerChannel)")
 
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Error: \(error)"
+            alert.informativeText = "Failed to load duration"
+            alert.runModal()
+        }
+        
+        
+        
+                                
         // Add time observer
-        currentTimeObserver = player?.addPeriodicTimeObserver(
-            forInterval: CMTimeMake(value: 1, timescale: 30), // Update at 30fps
-            queue: .main
-        ) { [weak self] time in
+        currentTimeObserver = player?.addPeriodicTimeObserver(forInterval: CMTimeMake(value: 1, timescale: 30), queue: .main) { [weak self] time in
             guard let self = self else { return }
             self.currentTime = CMTimeGetSeconds(time)
         }
@@ -103,7 +138,6 @@ class AudioPlaybackManager: NSObject {
     /// Seek to a specific time
     func seek(to time: TimeInterval) {
         guard let player = player else { return }
-
         let cmTime = CMTime(seconds: time, preferredTimescale: 1)
         player.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
             if finished {

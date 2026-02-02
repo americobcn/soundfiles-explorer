@@ -40,7 +40,7 @@ class AudioWaveformView: NSView {
     private let cacheSizeLimit = 10 // Limit number of cached waveforms
     
     /// Visual customization
-    var backgroundColor: NSColor = NSColor(calibratedWhite: 0.15, alpha: 1.0)
+    var backgroundColor: NSColor = NSColor(calibratedWhite: 0.35, alpha: 1.0)
     var waveformColors: [NSColor] = [
         NSColor(calibratedRed: 0.2, green: 0.6, blue: 1.0, alpha: 0.8),
         NSColor(calibratedRed: 1.0, green: 0.4, blue: 0.4, alpha: 0.8),
@@ -55,7 +55,7 @@ class AudioWaveformView: NSView {
     private let rulerHeight: CGFloat = 20
     private let channelSpacing: CGFloat = 2
     private let channelLabelWidth: CGFloat = 0
-    private let minChannelHeight: CGFloat = 40
+    private let minChannelHeight: CGFloat = 50
 
     /// Zoom and scroll
     var pixelsPerSecond: CGFloat = 100 {
@@ -71,8 +71,9 @@ class AudioWaveformView: NSView {
     }
 
     /// Waveform caching - Class-level cache
-    private static var waveformCache: [String: [[Float]]] = [:]
-    private static let cacheSizeLimit = 10 // Limit number of cached waveforms
+    // private static var waveformCache: [String: [[Float]]] = [:]
+    // private static let cacheSizeLimit = 10 // Limit number of cached waveforms
+    
     
     // MARK: - Initialization
     
@@ -87,11 +88,14 @@ class AudioWaveformView: NSView {
         print("AudioWavformView: required init")
         setupView()
     }
+            
     
+        
     private func setupView() {
         wantsLayer = true
         layer?.backgroundColor = backgroundColor.cgColor
         print("AudioWavformView: setupView")
+            
     }
     
     // MARK: - Audio Loading
@@ -117,10 +121,6 @@ class AudioWaveformView: NSView {
             // Set default channel names
             channelNames = (0..<channelCount).map { index in
                 switch index {
-                //  case 0: return "Boom Mic"
-                //  case 1: return "Wireless 1"
-                //  case 2: return "Wireless 2"
-                //  case 3: return "Wireless 3"
                 default: return "Channel \(index + 1)"
                 }
             }
@@ -140,7 +140,7 @@ class AudioWaveformView: NSView {
 
         // Check cache first
         let cacheKey = "\(file.url.absoluteString)-\(pixelsPerSecond)"
-        if let cachedWaveforms = Self.waveformCache[cacheKey] {
+        if let cachedWaveforms = waveformCache[cacheKey] {
             channelWaveforms = cachedWaveforms
             return
         }
@@ -155,7 +155,7 @@ class AudioWaveformView: NSView {
         channelWaveforms = Array(repeating: [], count: channelCount)
 
         // Read audio in chunks
-        let bufferSize: AVAudioFrameCount = 4096
+        let bufferSize: AVAudioFrameCount = 16384
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: bufferSize) else { return }
 
         var channelMaxValues: [[Float]] = Array(repeating: [], count: channelCount)
@@ -204,12 +204,12 @@ class AudioWaveformView: NSView {
         channelWaveforms = channelMaxValues
 
         // Cache the waveform data
-        Self.waveformCache[cacheKey] = channelWaveforms
+        waveformCache[cacheKey] = channelWaveforms
 
         // Clean up cache if needed
-        if Self.waveformCache.count > Self.cacheSizeLimit {
-            let oldestKey = Self.waveformCache.keys.first
-            Self.waveformCache.removeValue(forKey: oldestKey!)
+        if waveformCache.count > cacheSizeLimit {
+            let oldestKey = waveformCache.keys.first
+            waveformCache.removeValue(forKey: oldestKey!)
         }
     }
 
@@ -230,7 +230,7 @@ class AudioWaveformView: NSView {
             drawEmptyState(in: context)
             return
         }
-        
+            
         let waveformAreaHeight = bounds.height // - rulerHeight
         let channelHeight = (waveformAreaHeight - CGFloat(channelCount + 1) * channelSpacing) / CGFloat(channelCount)
         let actualChannelHeight = max(channelHeight, minChannelHeight)
@@ -454,17 +454,16 @@ class AudioWaveformView: NSView {
     
     /// Get the total width needed for the waveform
     func getTotalWidth() -> CGFloat {
-        return CGFloat(duration) * pixelsPerSecond // + channelLabelWidth
+        return CGFloat(duration) * pixelsPerSecond + channelLabelWidth
     }
         
     // MARK: - Mouse Interaction
     
     override func mouseDown(with event: NSEvent) {
         let location = convert(event.locationInWindow, from: nil)
-        
         if location.x >= channelLabelWidth {
-            let startTime = TimeInterval(scrollOffset / pixelsPerSecond)
-            let clickedTime = startTime + TimeInterval((location.x - channelLabelWidth) / pixelsPerSecond)
+            // let startTime = TimeInterval(scrollOffset / pixelsPerSecond)
+            let clickedTime =  TimeInterval((location.x - channelLabelWidth) / pixelsPerSecond) // startTime +
             currentTime = max(0, min(duration, clickedTime))
             
             // Notify delegate or post notification for seeking

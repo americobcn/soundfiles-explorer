@@ -17,10 +17,12 @@ private class AudioFile: NSObject {
     @objc var scene: String
     @objc var take: String
     @objc var timeCodeStart: String
+    @objc let duration: Double
     let url: URL
     let chCount: Int
     let bitDepth: Int
     let sampleRate: Int
+    
     let trackNames: [String: String] = [:]
     let bext: BEXTMetadata?
     let ixml: IXMLMetadata?
@@ -32,6 +34,7 @@ private class AudioFile: NSObject {
          url: URL, chCount: Int,
          bitDepth: Int,
          sampleRate: Int,
+         duration: Double,
          trackNames: [String: String] = [:],
          bext: BEXTMetadata?,
          ixml: IXMLMetadata?
@@ -43,6 +46,7 @@ private class AudioFile: NSObject {
         self.chCount = chCount
         self.bitDepth = bitDepth
         self.sampleRate = sampleRate
+        self.duration = duration
         self.bext = bext
         self.ixml = ixml
         self.timeCodeStart = timeCodeStart
@@ -63,6 +67,7 @@ private enum TableColumnIdentifiers: String, CaseIterable {
     case date = "date"
     case time = "time"
     case audioDescription = "audioDescription"
+    case duration = "duration"
 }
 
 
@@ -90,7 +95,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     private var notLoadedFiles: [String] = []
     private let metadataReader = AudioMetadataReader()
     private var timeLabel: NSTextField!
-    private var currentAudioDuration: CMTime = .zero
     
     
     // MARK: - Init
@@ -109,11 +113,13 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     // MARK: - Overrides
     override func viewDidLoad() {
         super.viewDidLoad()
+        setupMainView()
         setupTableView()
         setupPlayer()
-        searchField.delegate = self
         setupDisplayLink()
         setupNotifications()
+        
+        searchField.delegate = self
         
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             return event // Return the event to allow normal processing
@@ -133,31 +139,46 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             waveformViewPlayer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             waveformViewPlayer.bottomAnchor.constraint(equalTo: searchField.topAnchor)
         ])
-        
+                        
         NSLayoutConstraint.activate([
             mainStack.topAnchor.constraint(equalTo: waveformViewPlayer.topAnchor),
             mainStack.leadingAnchor.constraint(equalTo: waveformViewPlayer.leadingAnchor),
             mainStack.trailingAnchor.constraint(equalTo: waveformViewPlayer.trailingAnchor),
-            mainStack.bottomAnchor.constraint(equalTo: waveformViewPlayer.bottomAnchor),
-            controlsStackView.heightAnchor.constraint(equalToConstant: 50)
+            mainStack.bottomAnchor.constraint(equalTo: waveformViewPlayer.bottomAnchor)
         ])
         
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: mainStack.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: mainStack.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor)
+            scrollView.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+            controlsStackView.bottomAnchor.constraint(equalTo: searchField.topAnchor),
+            controlsStackView.heightAnchor.constraint(equalToConstant: 48)
         ])
-        
+                                                
         if let dv = scrollView.documentView {
             NSLayoutConstraint.activate([
                 dv.topAnchor.constraint(equalTo: scrollView.topAnchor),
+                dv.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
                 dv.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor)
             ])
         }
+                
+        NSLayoutConstraint.activate([
+            tableView.topAnchor.constraint(equalTo: searchField.bottomAnchor),
+            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
     }
     
         
     // MARK: - Setup Views
+    private func setupMainView() {
+        view.frame = NSRect(x: 0, y: 0, width: 1920, height: 1080)
+        waveformViewPlayer.translatesAutoresizingMaskIntoConstraints = false
+    }
+    
+    
     private func setupTableView() {
         tableView.delegate = self
         tableView.dataSource = self
@@ -194,22 +215,18 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             timeCodeColumn.sortDescriptorPrototype = timeCodeSortDescriptor
         }
         
+        let duartionSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.duration.rawValue,
+                                                   ascending: true,
+                                                   selector: #selector(NSString.localizedStandardCompare(_:)))
+        if let durationColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.duration.rawValue)) {
+            durationColumn.sortDescriptorPrototype = duartionSortDescriptor
+        }
+        
     }
     
     private func setupPlayer() {
-        // self.player = AVPlayer()
-        // self.playerView.player = self.player
-        // self.playerView.controlsStyle = .inline
-                
-        // AVAudioPlayer
-        self.mainStack = NSStackView(frame: waveformViewPlayer.bounds)
-        let scrollViewRect = NSRect(origin: CGPoint(x: waveformViewPlayer.bounds.width,
-                                                   y: waveformViewPlayer.bounds.height + 60.0),
-                                    size: CGSize(width: waveformViewPlayer.bounds.width,
-                                                 height: waveformViewPlayer.bounds.height - 60.0)
-        )
-        
-        scrollView = NSScrollView(frame: scrollViewRect)
+        scrollView = NSScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.autoresizingMask = [.width, .height]
         scrollView.hasHorizontalScroller = true
         scrollView.hasVerticalScroller = true
@@ -217,17 +234,20 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         scrollView.backgroundColor = NSColor(calibratedWhite: 0.15, alpha: 1.0)
         
         waveformView = AudioWaveformView(frame: scrollView.bounds)
+        waveformView.translatesAutoresizingMaskIntoConstraints = false
+        
         scrollView.documentView = waveformView
         scrollView.documentView?.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        
-        waveformViewPlayer.addSubview(mainStack)
                 
         setupControls()
-                                
+        
+        mainStack = NSStackView(frame: waveformViewPlayer.bounds) //
         mainStack.orientation = .vertical
-        mainStack.spacing = 0
+        mainStack.spacing = 1
         mainStack.translatesAutoresizingMaskIntoConstraints = false
+        
+        waveformViewPlayer.addSubview(mainStack)
+        
         mainStack.addArrangedSubview(scrollView)
         mainStack.addArrangedSubview(controlsStackView)
                                                                             
@@ -260,10 +280,11 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             zoomSlider,
             timeLabel
         ])
+        // controlsStackView.translatesAutoresizingMaskIntoConstraints = false
+        controlsStackView.wantsLayer = true
         controlsStackView.orientation = .horizontal
         controlsStackView.spacing = 10
         controlsStackView.edgeInsets = NSEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
-        controlsStackView.wantsLayer = true
         controlsStackView.layer?.backgroundColor = NSColor(calibratedWhite: 0.2, alpha: 1.0).cgColor
         
         // Make the spacer view expand
@@ -382,6 +403,12 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             else { return nil }
             viewCell.textField!.stringValue = "\(audioFiles[row].bitDepth)b \(audioFiles[row].sampleRate)Hz"
             return viewCell
+        case .duration:
+            guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
+            else { return nil }
+            let audioLength = formatTime(audioFiles[row].duration)
+            viewCell.textField!.stringValue = "\(audioLength)"
+            return viewCell
         default:
             return nil
         }
@@ -404,17 +431,15 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                 audioPlaybackManager.pause()
             }
             
-            // let playerItem = AVPlayerItem(url: audioFiles[selectedRow].url)
-            // self.player.replaceCurrentItem(with: playerItem)
-            
             // Load audioFile to AVAudioPlayer and update waveforms
-            audioPlaybackManager.loadAudioFile(audioFiles[selectedRow].url)
+            Task {
+                await audioPlaybackManager.loadAudioFile(audioFiles[selectedRow].url)
+            }
+            
             waveformView.audioURL = audioFiles[selectedRow].url
             
-            // print("SIZE: \(waveformView.frame.size)")
-            scrollView.documentView?.setFrameSize(waveformView.bounds.size)
+            scrollView.documentView?.setFrameSize(waveformViewPlayer.bounds.size)
             scrollView.needsDisplay = true
-            currentAudioDuration = CMTime(seconds: audioPlaybackManager.duration, preferredTimescale: 1)
             
                                                 
             #if DEBUG
@@ -487,12 +512,13 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                             print("\(r.category)::\t\(r.field) : \(r.value)")
                         }
                         Task {
-                            let asbd = try await loadAudioBasicDescription(for: url)
+                            let (asbd, duration) = try await loadAudioBasicDescription(for: url)
                             let audioFile = AudioFile(fileName: url.deletingPathExtension().lastPathComponent,
                                                       url: url,
                                                       chCount: Int(asbd.mChannelsPerFrame),
                                                       bitDepth: Int(asbd.mBitsPerChannel),
                                                       sampleRate: Int(asbd.mSampleRate),
+                                                      duration: duration,
                                                       bext: data.bext,
                                                       ixml: data.ixml)
                             
@@ -647,18 +673,21 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
 */
     
     //MARK: - Helpers Functions
-    func loadAudioBasicDescription(for url: URL) async throws -> AudioStreamBasicDescription {
-          let loadOptions = [AVURLAssetPreferPreciseDurationAndTimingKey: true]
-          let asset = AVURLAsset(url: url, options: loadOptions)
-
-          guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
-              throw AudioParserError.noAudioTrack
-          }
-
-          guard let asbd = try await track.load(.formatDescriptions).first?.audioFormatList.first?.mASBD else {
-              throw AudioParserError.malformedMetadata
-          }
-          return asbd
+    func loadAudioBasicDescription(for url: URL) async throws -> (AudioStreamBasicDescription, Float64) {
+        let loadOptions = [AVURLAssetPreferPreciseDurationAndTimingKey: true]
+        let asset = AVURLAsset(url: url, options: loadOptions)
+        
+        guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
+            throw AudioParserError.noAudioTrack
+        }
+        
+        guard let asbd = try await track.load(.formatDescriptions).first?.audioFormatList.first?.mASBD else {
+            throw AudioParserError.malformedMetadata
+        }
+        
+        let dr = try await asset.load(.duration)
+        let duration = CMTimeGetSeconds(dr)
+        return (asbd, duration)
       }
 
     
@@ -700,7 +729,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                 break
             }
         }
-        
+            
         let result: String = "\(bitDepth)bits \(sampleRate)Hz \(algorithm)"
         return result
     }
@@ -762,7 +791,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     }
  
     private var lastUpdateTime: CFTimeInterval = 0
-    private let updateInterval: CFTimeInterval = 1.0 / 30.0 // Update at 30fps max
+    private let updateInterval: CFTimeInterval = 1.0 / 60.0 // Update at 30fps max
 
     private func updatePlaybackPosition() {
         let currentTime = CACurrentMediaTime()
@@ -776,15 +805,9 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
 
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-
-            // self.waveformView.currentTime = player.currentTime
-            self.waveformView.currentTime = audioPlaybackManager.currentTime //player.currentItem?.currentTime().seconds ?? 0
+            self.waveformView.currentTime = audioPlaybackManager.getCurrentTime() //player.currentItem?.currentTime().seconds ?? 0
             self.updateTimeLabel()
-
-            // Auto-scroll to follow playback
-            // if player.isPlaying {
-            //     self.scrollToFollowPlayback()
-            // }
+        
             if audioPlaybackManager.rate != 0 {
                 self.scrollToFollowPlayback()
             }
@@ -792,17 +815,13 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     }
     
     private func updateTimeLabel() {
-        // guard let player = audioPlayer else {
-        //     timeLabel.stringValue = "0:00.00 / 0:00.00"
-        //     return
-        // }
-        
-        // let current = formatTime(player.currentTime)
-        // let total = formatTime(player.duration)
+        guard let audioPlaybackManager else {
+            timeLabel.stringValue = "0:00.00 / 0:00.00"
+            return
+        }
+                
         let current = formatTime(audioPlaybackManager.currentTime)
-        let total = formatTime(audioPlaybackManager.duration)
-        // guard let currentTime = player.currentItem?.currentTime().seconds else { return }
-        // let total = formatTime(currentAudioDuration!.seconds)
+        let total = formatTime(audioPlaybackManager.duration)        
         
         timeLabel.stringValue = "\(current) / \(total)"
     }
@@ -834,12 +853,9 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     }
     
     @objc private func waveformViewDidSeek(_ notification: Notification) {
-        // guard let player = audioPlayer else { return }  // let time = notification.userInfo?["time"] as? TimeInterval,
-        
-        // player.currentTime = time
-        // player.seek(to: currentTime)
-        audioPlaybackManager.seek(to: audioPlaybackManager.currentTime) //CMTime(seconds: time, preferredTimescale: 1)
-        waveformView.currentTime = audioPlaybackManager.currentTime
+        print("Mouse Notification: \(notification)")
+        guard let time = (notification.userInfo?["time"] as? TimeInterval) else { return }
+        audioPlaybackManager.seek(to: time)        
     }
     
     private func setupNotifications() {
@@ -857,17 +873,5 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         let seconds = Int(time) % 60
         let milliseconds = Int((time.truncatingRemainder(dividingBy: 1)) * 100)
         return String(format: "%d:%02d.%02d", minutes, seconds, milliseconds)
-    }
-}
-
-
-extension AVAssetTrack {
-    var channelCount: Int {
-        guard let formatDescriptions = formatDescriptions as? [CMAudioFormatDescription],
-              let audioFormatDesc = formatDescriptions.first,
-              let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(audioFormatDesc)
-        else { return 0 }
-        
-        return Int(asbd.pointee.mChannelsPerFrame)
     }
 }
