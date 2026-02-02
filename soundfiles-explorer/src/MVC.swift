@@ -9,6 +9,9 @@ import Cocoa
 import AVFoundation
 import AVKit
 
+// Import the custom classes
+import Foundation
+
 private class AudioFile: NSObject {
     @objc let fileName: String
     @objc var scene: String
@@ -72,17 +75,15 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     @IBOutlet weak var waveformViewPlayer: NSView!
     
     // MARK: - Variables
-    private var audioPlayer: AVPlayer!
-    // private var audioPlayer: AVAudioPlayer?
-    
+    private var audioPlaybackManager: AudioPlaybackManager!
     private var waveformView: AudioWaveformView!
     private var scrollView: NSScrollView!
     private var controlsStackView: NSStackView!
     private var playPauseButton: NSButton!
     private var zoomSlider: NSSlider!
     private var mainStack: NSStackView!
-    
-    
+
+
     private var displayLink: CVDisplayLink?
     private var audioFiles: [AudioFile] = []
     private var backupAudioFiles: [AudioFile] = []
@@ -95,7 +96,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     // MARK: - Init
     required init?(coder: NSCoder) {
         super.init(coder: coder)
-        self.audioPlayer = AVPlayer()
+        self.audioPlaybackManager = AudioPlaybackManager()
     }
     
     deinit {
@@ -113,7 +114,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         searchField.delegate = self
         setupDisplayLink()
         setupNotifications()
-        waveformViewPlayer.autoresizingMask = [.width, .height]
         
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             return event // Return the event to allow normal processing
@@ -123,17 +123,15 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     override func viewDidAppear() {
         super.viewDidAppear()
         setupLayouts()
-        
     }
     
     // MARK: - Layouts
     func setupLayouts() {
         NSLayoutConstraint.activate([
-            // waveformViewPlayer.topAnchor.constraint(equalTo: waveformViewPlayer.topAnchor),
-            // waveformViewPlayer.leadingAnchor.constraint(equalTo: waveformViewPlayer.leadingAnchor),
-            // waveformViewPlayer.trailingAnchor.constraint(equalTo: waveformViewPlayer.trailingAnchor),
+            waveformViewPlayer.topAnchor.constraint(equalTo: view.topAnchor),
+            waveformViewPlayer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            waveformViewPlayer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             waveformViewPlayer.bottomAnchor.constraint(equalTo: searchField.topAnchor)
-            
         ])
         
         NSLayoutConstraint.activate([
@@ -158,8 +156,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         }
     }
     
-    
-    
+        
     // MARK: - Setup Views
     private func setupTableView() {
         tableView.delegate = self
@@ -403,29 +400,22 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         let tableView = notification.object as! NSTableView
         let selectedRow = tableView.selectedRow
         if selectedRow != -1 {
-            if let player = self.audioPlayer {
-                if player.rate != 0.0 {
-                    player.rate = 0.0
-                }
+            if audioPlaybackManager.isPlaying {
+                audioPlaybackManager.pause()
             }
             
             // let playerItem = AVPlayerItem(url: audioFiles[selectedRow].url)
             // self.player.replaceCurrentItem(with: playerItem)
             
             // Load audioFile to AVAudioPlayer and update waveforms
-            loadAudioURL(audioFiles[selectedRow].url)
+            audioPlaybackManager.loadAudioFile(audioFiles[selectedRow].url)
             waveformView.audioURL = audioFiles[selectedRow].url
             
             // print("SIZE: \(waveformView.frame.size)")
             scrollView.documentView?.setFrameSize(waveformView.bounds.size)
             scrollView.needsDisplay = true
-            Task {
-                do {
-                    currentAudioDuration = try await audioPlayer!.currentItem!.asset.load(.duration)
-                } catch {
-                    print("Error getting audio duration")
-                }
-            }
+            currentAudioDuration = CMTime(seconds: audioPlaybackManager.duration, preferredTimescale: 1)
+            
                                                 
             #if DEBUG
             // print("\nFILE DESCRIPTION START")
@@ -566,7 +556,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             print("Command Key")
             switch event.keyCode {
             case 36: // Return
-                stopAndGoStartEnd(event.modifierFlags)
+                // stopAndGoStartEnd(event.modifierFlags)
                 break
             default:
                 super.keyDown(with: event)
@@ -574,7 +564,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         case .control:
             switch event.keyCode {
             case 36: // Return
-                stopAndGoStartEnd(event.modifierFlags)
+                // stopAndGoStartEnd(event.modifierFlags)
                 break
             default:
                 super.keyDown(with: event)
@@ -595,7 +585,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                 playForward()
                 break
             case 36: // Return
-                stopAndGoStartEnd(event.modifierFlags)
+                // stopAndGoStartEnd(event.modifierFlags)
                 break
             default:
                 super.keyDown(with: event)
@@ -607,45 +597,38 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     
     
     @objc private func playPause() {
-        // if playerView.player?.rate == 0.0  {
-        //     playerView.player?.play()
-        // } else {
-        //     playerView.player?.pause()
-        // }
-        
         // AVAudioPlayer
-        guard let player = audioPlayer else { return }
-        
         if waveformView.isPlaying {
-            player.pause()
+            audioPlaybackManager.pause()
             playPauseButton.title = "▶ Play"
             waveformView.isPlaying = false
         } else {
-            player.play()
+            audioPlaybackManager.play()
             playPauseButton.title = "⏸ Pause"
             waveformView.isPlaying = true
         }
     }
     
     @objc private func playRewind() {
-        guard let player = audioPlayer else { return }
-        player.rate = player.rate - 1.5
+        // guard let player = audioPlayer else { return }
+        audioPlaybackManager.setRate(audioPlaybackManager.rate - 1.5)
         waveformView.isPlaying = true
     }
     
     @objc private func playForward() {
-        guard let player = audioPlayer else { return }
-        player.rate = player.rate + 1.5
+        // guard let player = audioPlayer else { return }
+        audioPlaybackManager.setRate(audioPlaybackManager.rate + 1.5)
         waveformView.isPlaying = true
     }
     
+/*
     @objc private func stopAndGoStartEnd(_ modifier: NSEvent.ModifierFlags) {
-        guard let player = audioPlayer else { return }
+        // guard let player = audioPlayer else { return }
         // player.stop()
         let destTime = (modifier.rawValue != 262401) ? CMTime(seconds: 0.0, preferredTimescale: 1)
                                             : CMTime(seconds: currentAudioDuration.seconds, preferredTimescale: 1)
         
-        player.seek(to: destTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
+        audioPlaybackManager.seek(to: CMTimeGetSeconds(destTime)) { [weak self] finished in
             DispatchQueue.main.async {
                 if finished {
                     player.pause()
@@ -661,7 +644,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         }
                 
     }
-    
+*/
     
     //MARK: - Helpers Functions
     func loadAudioBasicDescription(for url: URL) async throws -> AudioStreamBasicDescription {
@@ -739,6 +722,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     
     
     // MARK: - AVAudioPlayer Methods
+/*
     func loadAudioURL(_ url: URL) {
         // Setup audio player
         do {
@@ -748,7 +732,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             // audioPlayer?.enableRate = true
             let asset = AVAsset(url: url)
             let item = AVPlayerItem(asset: asset)
-            self.audioPlayer.replaceCurrentItem(with: item)
+            // self.audioPlayer.replaceCurrentItem(with: item)
             self.currentAudioDuration = item.duration
             
             // You can customize channel names based on your audio file
@@ -763,7 +747,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             alert.runModal()
         }
     }
-    
+*/
     
     private func setupDisplayLink() {
         CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
@@ -777,35 +761,46 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         }
     }
  
+    private var lastUpdateTime: CFTimeInterval = 0
+    private let updateInterval: CFTimeInterval = 1.0 / 30.0 // Update at 30fps max
+
     private func updatePlaybackPosition() {
+        let currentTime = CACurrentMediaTime()
+
+        // Rate limit updates to prevent excessive CPU usage
+        if currentTime - lastUpdateTime < updateInterval {
+            return
+        }
+
+        lastUpdateTime = currentTime
+
         DispatchQueue.main.async { [weak self] in
-            guard let self = self,
-                  let player = self.audioPlayer else { return }
-            
+            guard let self = self else { return }
+
             // self.waveformView.currentTime = player.currentTime
-            self.waveformView.currentTime = player.currentItem?.currentTime().seconds ?? 0
+            self.waveformView.currentTime = audioPlaybackManager.currentTime //player.currentItem?.currentTime().seconds ?? 0
             self.updateTimeLabel()
-            
+
             // Auto-scroll to follow playback
             // if player.isPlaying {
             //     self.scrollToFollowPlayback()
             // }
-            if player.rate != 0 {
+            if audioPlaybackManager.rate != 0 {
                 self.scrollToFollowPlayback()
             }
         }
     }
     
     private func updateTimeLabel() {
-        guard let player = audioPlayer else {
-            timeLabel.stringValue = "0:00.00 / 0:00.00"
-            return
-        }
+        // guard let player = audioPlayer else {
+        //     timeLabel.stringValue = "0:00.00 / 0:00.00"
+        //     return
+        // }
         
         // let current = formatTime(player.currentTime)
         // let total = formatTime(player.duration)
-        let current = formatTime(player.currentTime().seconds)
-        let total = formatTime(currentAudioDuration.seconds)
+        let current = formatTime(audioPlaybackManager.currentTime)
+        let total = formatTime(audioPlaybackManager.duration)
         // guard let currentTime = player.currentItem?.currentTime().seconds else { return }
         // let total = formatTime(currentAudioDuration!.seconds)
         
@@ -813,11 +808,11 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     }
         
     private func scrollToFollowPlayback() {
-        guard let player = audioPlayer else { return }
+        // guard let player = audioPlayer else { return }
         
         let visibleRect = scrollView.documentVisibleRect
         // let cursorX = 120 + CGFloat(player.currentTime) * waveformView.pixelsPerSecond
-        let cursorX = 120 + CGFloat(player.currentTime().seconds) * waveformView.pixelsPerSecond
+        let cursorX = 120 + CGFloat(audioPlaybackManager.currentTime) * waveformView.pixelsPerSecond
         
         // Scroll if cursor is near the edges or outside visible area
         let scrollMargin: CGFloat = 100
@@ -839,12 +834,12 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     }
     
     @objc private func waveformViewDidSeek(_ notification: Notification) {
-        guard let player = audioPlayer else { return }  // let time = notification.userInfo?["time"] as? TimeInterval, 
-        guard let currentTime = player.currentItem?.currentTime() else { return }
+        // guard let player = audioPlayer else { return }  // let time = notification.userInfo?["time"] as? TimeInterval,
+        
         // player.currentTime = time
         // player.seek(to: currentTime)
-        player.seek(to: currentTime, toleranceBefore: .zero, toleranceAfter: .zero) //CMTime(seconds: time, preferredTimescale: 1)
-        waveformView.currentTime = currentTime.seconds
+        audioPlaybackManager.seek(to: audioPlaybackManager.currentTime) //CMTime(seconds: time, preferredTimescale: 1)
+        waveformView.currentTime = audioPlaybackManager.currentTime
     }
     
     private func setupNotifications() {

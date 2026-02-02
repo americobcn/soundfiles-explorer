@@ -35,6 +35,10 @@ class AudioWaveformView: NSView {
     
     var isPlaying: Bool = false
     
+    /// Waveform caching
+    private var waveformCache: [String: [[Float]]] = [:]
+    private let cacheSizeLimit = 10 // Limit number of cached waveforms
+    
     /// Visual customization
     var backgroundColor: NSColor = NSColor(calibratedWhite: 0.15, alpha: 1.0)
     var waveformColors: [NSColor] = [
@@ -52,19 +56,23 @@ class AudioWaveformView: NSView {
     private let channelSpacing: CGFloat = 2
     private let channelLabelWidth: CGFloat = 0
     private let minChannelHeight: CGFloat = 40
-    
+
     /// Zoom and scroll
     var pixelsPerSecond: CGFloat = 100 {
         didSet {
             needsDisplay = true
         }
     }
-    
+
     var scrollOffset: CGFloat = 0 {
         didSet {
             needsDisplay = true
         }
     }
+
+    /// Waveform caching - Class-level cache
+    private static var waveformCache: [String: [[Float]]] = [:]
+    private static let cacheSizeLimit = 10 // Limit number of cached waveforms
     
     // MARK: - Initialization
     
@@ -129,31 +137,39 @@ class AudioWaveformView: NSView {
     
     private func generateWaveforms(from file: AVAudioFile, channelCount: Int) {
         print("Generate Waveforms called")
+
+        // Check cache first
+        let cacheKey = "\(file.url.absoluteString)-\(pixelsPerSecond)"
+        if let cachedWaveforms = Self.waveformCache[cacheKey] {
+            channelWaveforms = cachedWaveforms
+            return
+        }
+
         let format = file.processingFormat
         let totalSamples = Int(file.length)
-        
+
         // Determine how many samples per pixel for waveform generation
         let desiredWaveformPoints = Int(duration * Double(pixelsPerSecond))
         let samplesPerPoint = max(1, totalSamples / desiredWaveformPoints)
-        
+
         channelWaveforms = Array(repeating: [], count: channelCount)
-        
+
         // Read audio in chunks
         let bufferSize: AVAudioFrameCount = 4096
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: bufferSize) else { return }
-        
+
         var channelMaxValues: [[Float]] = Array(repeating: [], count: channelCount)
         var sampleCounter = 0
         var currentMaxes: [Float] = Array(repeating: 0, count: channelCount)
-        
+
         file.framePosition = 0
-        
+
         while file.framePosition < file.length {
             do {
                 try file.read(into: buffer)
-                
+
                 let frameLength = Int(buffer.frameLength)
-                
+
                 for frame in 0..<frameLength {
                     for channel in 0..<channelCount {
                         if let channelData = buffer.floatChannelData?[channel] {
@@ -161,9 +177,9 @@ class AudioWaveformView: NSView {
                             currentMaxes[channel] = max(currentMaxes[channel], sample)
                         }
                     }
-                    
+
                     sampleCounter += 1
-                    
+
                     if sampleCounter >= samplesPerPoint {
                         for channel in 0..<channelCount {
                             channelMaxValues[channel].append(currentMaxes[channel])
@@ -172,13 +188,13 @@ class AudioWaveformView: NSView {
                         sampleCounter = 0
                     }
                 }
-                
+
             } catch {
                 print("Error reading audio buffer: \(error)")
                 break
             }
         }
-        
+
         // Store final values
         for channel in 0..<channelCount {
             if currentMaxes[channel] > 0 {
@@ -186,6 +202,15 @@ class AudioWaveformView: NSView {
             }
         }
         channelWaveforms = channelMaxValues
+
+        // Cache the waveform data
+        Self.waveformCache[cacheKey] = channelWaveforms
+
+        // Clean up cache if needed
+        if Self.waveformCache.count > Self.cacheSizeLimit {
+            let oldestKey = Self.waveformCache.keys.first
+            Self.waveformCache.removeValue(forKey: oldestKey!)
+        }
     }
 
     // MARK: - Drawing
@@ -466,9 +491,24 @@ extension AudioWaveformView {
     }
     
     /// Call this when zoom changes to update the scroll view
-    func updateContentSize() {                
+    func updateContentSize() {
         invalidateIntrinsicContentSize()
         needsDisplay = true
+    }
+}
+
+// MARK: - Waveform Caching
+
+extension AudioWaveformView {
+    
+    /// Cache waveform data to avoid regeneration
+    private func cacheWaveform(_ key: String, waveforms: [[Float]]) {
+        // Remove oldest entry if cache is full
+        if waveformCache.count >= cacheSizeLimit {
+            let oldestKey = waveformCache.keys.first
+            waveformCache.removeValue(forKey: oldestKey!)
+        }
+        waveformCache[key] = waveforms
     }
 }
 
