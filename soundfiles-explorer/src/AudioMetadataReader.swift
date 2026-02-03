@@ -225,17 +225,17 @@ final class AudioMetadataReader {
         let data = try Data(contentsOf: url, options: .mappedIfSafe)
 
         guard data.count > 12 else {
-            throw NSError(domain: "AudioParser", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid file"])
+            throw  AudioParserError.invalidFile
         }
 
         let riffID = data.readString(at: 0, length: 4)
         guard riffID == "RIFF" else {
-            throw NSError(domain: "AudioParser", code: -2, userInfo: [NSLocalizedDescriptionKey: "Not a RIFF file"])
+            throw AudioParserError.notRiff
         }
 
         let waveID = data.readString(at: 8, length: 4)
         guard waveID == "WAVE" else {
-            throw NSError(domain: "AudioParser", code: -3, userInfo: [NSLocalizedDescriptionKey: "Not a WAVE file"])
+            throw  AudioParserError.notWave
         }
 
         var offset = 12

@@ -35,9 +35,21 @@ class AudioWaveformView: NSView {
     
     var isPlaying: Bool = false
     
-    /// Waveform caching
-    private var waveformCache: [String: [[Float]]] = [:]
-    private let cacheSizeLimit = 10 // Limit number of cached waveforms
+    /// Waveform caching using NSCache for thread-safe, automatic eviction
+    private static let waveformCache: NSCache<NSString, WaveformCacheEntry> = {
+        let cache = NSCache<NSString, WaveformCacheEntry>()
+        cache.countLimit = 10
+        return cache
+    }()
+    
+    /// Wrapper class for cache values since NSCache requires NSObject
+    private class WaveformCacheEntry: NSObject {
+        let waveforms: [[Float]]
+        init(waveforms: [[Float]]) {
+            self.waveforms = waveforms
+            super.init()
+        }
+    }
     
     /// Visual customization
     var backgroundColor: NSColor = NSColor(calibratedWhite: 0.35, alpha: 1.0)
@@ -55,7 +67,7 @@ class AudioWaveformView: NSView {
     private let rulerHeight: CGFloat = 20
     private let channelSpacing: CGFloat = 2
     private let channelLabelWidth: CGFloat = 0
-    private let minChannelHeight: CGFloat = 50
+    private let minChannelHeight: CGFloat = 60
 
     /// Zoom and scroll
     var pixelsPerSecond: CGFloat = 100 {
@@ -139,9 +151,9 @@ class AudioWaveformView: NSView {
         print("Generate Waveforms called")
 
         // Check cache first
-        let cacheKey = "\(file.url.absoluteString)-\(pixelsPerSecond)"
-        if let cachedWaveforms = waveformCache[cacheKey] {
-            channelWaveforms = cachedWaveforms
+        let cacheKey = "\(file.url.absoluteString)-\(pixelsPerSecond)" as NSString
+        if let cachedEntry = Self.waveformCache.object(forKey: cacheKey) {
+            channelWaveforms = cachedEntry.waveforms
             return
         }
 
@@ -203,14 +215,8 @@ class AudioWaveformView: NSView {
         }
         channelWaveforms = channelMaxValues
 
-        // Cache the waveform data
-        waveformCache[cacheKey] = channelWaveforms
-
-        // Clean up cache if needed
-        if waveformCache.count > cacheSizeLimit {
-            let oldestKey = waveformCache.keys.first
-            waveformCache.removeValue(forKey: oldestKey!)
-        }
+        // Cache the waveform data - NSCache handles eviction automatically
+        Self.waveformCache.setObject(WaveformCacheEntry(waveforms: channelWaveforms), forKey: cacheKey)
     }
 
     // MARK: - Drawing
@@ -230,9 +236,10 @@ class AudioWaveformView: NSView {
             drawEmptyState(in: context)
             return
         }
-            
+        
+        print("Channel Count: \(channelCount)")
         let waveformAreaHeight = bounds.height // - rulerHeight
-        let channelHeight = (waveformAreaHeight - CGFloat(channelCount + 1) * channelSpacing) / CGFloat(channelCount)
+        let channelHeight = waveformAreaHeight / CGFloat(channelCount) //(waveformAreaHeight - CGFloat(channelCount + 1) * channelSpacing) / CGFloat(channelCount)
         let actualChannelHeight = max(channelHeight, minChannelHeight)
                 
         
@@ -501,13 +508,9 @@ extension AudioWaveformView {
 extension AudioWaveformView {
     
     /// Cache waveform data to avoid regeneration
+    /// Note: NSCache automatically handles eviction, no manual cleanup needed
     private func cacheWaveform(_ key: String, waveforms: [[Float]]) {
-        // Remove oldest entry if cache is full
-        if waveformCache.count >= cacheSizeLimit {
-            let oldestKey = waveformCache.keys.first
-            waveformCache.removeValue(forKey: oldestKey!)
-        }
-        waveformCache[key] = waveforms
+        Self.waveformCache.setObject(WaveformCacheEntry(waveforms: waveforms), forKey: key as NSString)
     }
 }
 

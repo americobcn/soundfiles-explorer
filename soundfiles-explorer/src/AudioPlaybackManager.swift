@@ -77,7 +77,6 @@ class AudioPlaybackManager: NSObject {
             let assetDuration = try await asset.load(.duration)
             duration = CMTimeGetSeconds(assetDuration)
             
-            
             // Get channels count
             let assetTracks = try await asset.load(.tracks)
             let track = assetTracks.first(where: { $0.mediaType == .audio })!
@@ -106,10 +105,14 @@ class AudioPlaybackManager: NSObject {
         
         
                                 
-        // Add time observer
-        currentTimeObserver = player?.addPeriodicTimeObserver(forInterval: CMTimeMake(value: 1, timescale: 30), queue: .main) { [weak self] time in
+        // Add time observer on background queue to avoid blocking main thread
+        let processingQueue = DispatchQueue(label: "com.audio.timeObserver", qos: .userInitiated)
+        currentTimeObserver = player?.addPeriodicTimeObserver(forInterval: CMTimeMake(value: 1, timescale: 30), queue: processingQueue) { [weak self] time in
             guard let self = self else { return }
-            self.currentTime = CMTimeGetSeconds(time)
+            let timeValue = CMTimeGetSeconds(time)
+            DispatchQueue.main.async {
+                self.currentTime = timeValue
+            }
         }
         isObserving = true
     }

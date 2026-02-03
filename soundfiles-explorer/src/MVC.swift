@@ -22,7 +22,6 @@ private class AudioFile: NSObject {
     let chCount: Int
     let bitDepth: Int
     let sampleRate: Int
-    
     let trackNames: [String: String] = [:]
     let bext: BEXTMetadata?
     let ixml: IXMLMetadata?
@@ -120,10 +119,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         setupNotifications()
         
         searchField.delegate = self
-        
-        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            return event // Return the event to allow normal processing
-        }
     }
 
     override func viewDidAppear() {
@@ -154,15 +149,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             controlsStackView.bottomAnchor.constraint(equalTo: searchField.topAnchor),
             controlsStackView.heightAnchor.constraint(equalToConstant: 48)
         ])
-                                                
-        if let dv = scrollView.documentView {
-            NSLayoutConstraint.activate([
-                dv.topAnchor.constraint(equalTo: scrollView.topAnchor),
-                dv.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-                dv.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor)
-            ])
-        }
-                
+                                                                        
         NSLayoutConstraint.activate([
             tableView.topAnchor.constraint(equalTo: searchField.bottomAnchor),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -288,16 +275,15 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         controlsStackView.layer?.backgroundColor = NSColor(calibratedWhite: 0.2, alpha: 1.0).cgColor
         
         // Make the spacer view expand
-        let spacer = controlsStackView.arrangedSubviews[2]
+        let spacer = controlsStackView.arrangedSubviews[1]
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        
     }
     
 
     private func deleteSelectedRows() {
         let selectedIndexes = tableView.selectedRowIndexes
         // Ensure there is something to delete
-        guard selectedIndexes.isEmpty else { return }
+        guard !selectedIndexes.isEmpty else { return }
         
         // Convert to an array and delete items from the data source
         let indexesToRemove = selectedIndexes.sorted(by: >) // Sort in descending order
@@ -433,10 +419,12 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             
             // Load audioFile to AVAudioPlayer and update waveforms
             Task {
+                waveformView.audioURL = audioFiles[selectedRow].url
                 await audioPlaybackManager.loadAudioFile(audioFiles[selectedRow].url)
+                
             }
             
-            waveformView.audioURL = audioFiles[selectedRow].url
+            
             
             scrollView.documentView?.setFrameSize(waveformViewPlayer.bounds.size)
             scrollView.needsDisplay = true
@@ -529,12 +517,14 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                                 if let take = ixml.take {
                                     audioFile.take = take
                                 }
-                                
                                 let tcr = ixml.parsedData["TIMECODE_RATE"]!.split(separator: "/")
-                                audioFile.timeCodeStart = timecodeFromTimeReference(samples: Int64(bext.timeReferenceSamples),
-                                                                               sampleRate: Double(audioFile.sampleRate),
-                                                                               frameRate: Double(tcr[0])!
-                                )
+                                if  !tcr.isEmpty {
+                                    audioFile.timeCodeStart = timecodeFromTimeReference(samples: Int64(bext.timeReferenceSamples),
+                                                                                   sampleRate: Double(audioFile.sampleRate),
+                                                                                   frameRate: Double(tcr[0])!
+                                    )
+                                }
+                                
                             }
                             
                             self.audioFiles.append(audioFile)
