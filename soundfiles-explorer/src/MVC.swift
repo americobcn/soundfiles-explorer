@@ -8,6 +8,7 @@
 import Cocoa
 import AVFoundation
 import AVKit
+import QuartzCore
 
 // Import the custom classes
 import Foundation
@@ -89,7 +90,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     private var mainStack: NSStackView!
 
 
-    private var displayLink: CVDisplayLink?
+    private var displayLink: CADisplayLink?
     private var audioFiles: [AudioFile] = []
     private var backupAudioFiles: [AudioFile] = []
     private var notLoadedFiles: [String] = []
@@ -104,9 +105,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     }
     
     deinit {
-        if let displayLink = displayLink {
-            CVDisplayLinkStop(displayLink)
-        }
+        displayLink?.invalidate()
     }
     
     
@@ -775,21 +774,14 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
 */
     
     private func setupDisplayLink() {
-        CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
-        if let displayLink = displayLink {
-            CVDisplayLinkSetOutputCallback(displayLink, { (displayLink, inNow, inOutputTime, flagsIn, flagsOut, displayLinkContext) -> CVReturn in
-                let controller = Unmanaged<MVC>.fromOpaque(displayLinkContext!).takeUnretainedValue()
-                controller.updatePlaybackPosition()
-                return kCVReturnSuccess
-            }, Unmanaged.passUnretained(self).toOpaque())
-            CVDisplayLinkStart(displayLink)
-        }
+        displayLink = self.view.displayLink(target: self, selector: #selector(updatePlaybackPosition))
+        displayLink?.add(to: .main, forMode: .common)
     }
  
     private var lastUpdateTime: CFTimeInterval = 0
     private let updateInterval: CFTimeInterval = 1.0 / 60.0 // Update at 30fps max
 
-    private func updatePlaybackPosition() {
+    @objc private func updatePlaybackPosition() {
         let currentTime = CACurrentMediaTime()
 
         // Rate limit updates to prevent excessive CPU usage
@@ -803,10 +795,10 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             guard let self = self else { return }
             self.waveformView.currentTime = audioPlaybackManager.getCurrentTime() //player.currentItem?.currentTime().seconds ?? 0
             self.updateTimeLabel()
-        
-            if audioPlaybackManager.rate != 0 {
-                self.scrollToFollowPlayback()
-            }
+            self.scrollToFollowPlayback()
+            // if audioPlaybackManager.rate != 0 {
+            //     self.scrollToFollowPlayback()
+            // }
         }
     }
     
@@ -823,11 +815,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     }
         
     private func scrollToFollowPlayback() {
-        // guard let player = audioPlayer else { return }
-        
         let visibleRect = scrollView.documentVisibleRect
-        // let cursorX = 120 + CGFloat(player.currentTime) * waveformView.pixelsPerSecond
-        let cursorX = 120 + CGFloat(audioPlaybackManager.currentTime) * waveformView.pixelsPerSecond
+        let cursorX = CGFloat(audioPlaybackManager.currentTime) * waveformView.pixelsPerSecond // 120 +
         
         // Scroll if cursor is near the edges or outside visible area
         let scrollMargin: CGFloat = 100
