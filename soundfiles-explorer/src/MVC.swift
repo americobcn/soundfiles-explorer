@@ -633,16 +633,18 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     @objc private func playRewind() {
         // guard let player = audioPlayer else { return }
         audioPlaybackManager.setRate(audioPlaybackManager.rate - 1.5)
+        audioPlaybackManager.isPlaying = true
         waveformView.isPlaying = true
     }
     
     @objc private func playForward() {
         // guard let player = audioPlayer else { return }
         audioPlaybackManager.setRate(audioPlaybackManager.rate + 1.5)
+        audioPlaybackManager.isPlaying = true
         waveformView.isPlaying = true
     }
     
-/*
+
     @objc private func stopAndGoStartEnd(_ modifier: NSEvent.ModifierFlags) {
         // guard let player = audioPlayer else { return }
         // player.stop()
@@ -665,7 +667,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         }
                 
     }
-*/
+
     
     //MARK: - Helpers Functions
     func loadAudioBasicDescription(for url: URL) async throws -> (AudioStreamBasicDescription, Float64) {
@@ -775,6 +777,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     
     private func setupDisplayLink() {
         displayLink = self.view.displayLink(target: self, selector: #selector(updatePlaybackPosition))
+        displayLink?.isPaused = true
         displayLink?.add(to: .main, forMode: .common)
     }
  
@@ -793,12 +796,9 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
 
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.waveformView.currentTime = audioPlaybackManager.getCurrentTime() //player.currentItem?.currentTime().seconds ?? 0
+            self.waveformView.currentTime = audioPlaybackManager.getCurrentTime()
             self.updateTimeLabel()
             self.scrollToFollowPlayback()
-            // if audioPlaybackManager.rate != 0 {
-            //     self.scrollToFollowPlayback()
-            // }
         }
     }
     
@@ -850,6 +850,18 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             name: NSNotification.Name("AudioWaveformViewDidSeek"),
             object: waveformView
         )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(playbackStateChanged(_:)),
+            name: NSNotification.Name("AudioPlaybackStateChanged"),
+            object: audioPlaybackManager
+        )
+    }
+    
+    @objc private func playbackStateChanged(_ notification: Notification) {
+        guard let isPlaying = notification.userInfo?["isPlaying"] as? Bool else { return }
+        displayLink?.isPaused = !isPlaying
     }
     
     private func formatTime(_ time: TimeInterval) -> String {
