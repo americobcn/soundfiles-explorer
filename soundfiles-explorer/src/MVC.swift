@@ -235,8 +235,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         setupControls()
         
         mainStack = NSStackView(frame: waveformViewPlayer.bounds)
-        scrollView.setFrameSize(mainStack.frame.size)
-        waveformView.setFrameSize(scrollView.frame.size)
+        // scrollView.setFrameSize(mainStack.frame.size)
+        // waveformView.setFrameSize(scrollView.frame.size)
         
         mainStack.translatesAutoresizingMaskIntoConstraints = false
         mainStack.wantsLayer = true

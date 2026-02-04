@@ -68,9 +68,10 @@ class AudioWaveformView: NSView {
     
     /// Layout constants
     private let rulerHeight: CGFloat = 20
-    private let channelSpacing: CGFloat = 2
+    private let channelSpacing: CGFloat = 1
     private let channelLabelWidth: CGFloat = 0
-    private let minChannelHeight: CGFloat = 50
+    private let minChannelHeight: CGFloat = 40
+    private let maxChannelHeight: CGFloat = 80
 
     /// Zoom and scroll
     var pixelsPerSecond: CGFloat = 100 {
@@ -106,12 +107,8 @@ class AudioWaveformView: NSView {
                 
     private func setupView() {
         wantsLayer = true
-        // layer?.backgroundColor = backgroundColor.cgColor
-        layer?.borderColor = NSColor.red.cgColor
-        layer?.borderWidth = 1
-        print("AudioWavformView: setupView")
-            
     }
+    
     
     // MARK: - Audio Loading
     func loadAudioFile(_ url: URL) {
@@ -226,7 +223,7 @@ class AudioWaveformView: NSView {
     
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        
+        // print("bounds: \(bounds), frame: \(frame), intrinsicContentSize: \(intrinsicContentSize)")
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         
         // Draw background
@@ -241,14 +238,19 @@ class AudioWaveformView: NSView {
         }
                 
         
-        let channelHeight = (CGFloat(channelCount) * (minChannelHeight + channelSpacing) + channelSpacing) / CGFloat(channelCount)
+        // let channelHeight = (CGFloat(channelCount) * (minChannelHeight + channelSpacing) + channelSpacing) / CGFloat(channelCount)
+        // let actualChannelHeight = max(channelHeight, minChannelHeight)
+        
+        let availableHeight = bounds.height
+        let totalSpacing = CGFloat(channelCount + 1) * channelSpacing
+        let channelHeight = (availableHeight - totalSpacing) / CGFloat(channelCount)
         let actualChannelHeight = max(channelHeight, minChannelHeight)
         
         // Draw each channel
         for (index, waveform) in channelWaveforms.enumerated() {
-            let yPosition = channelSpacing + CGFloat(index) * (actualChannelHeight + channelSpacing) //  - rulerHeight / 2
+            let yPosition = channelSpacing + CGFloat(index) * (actualChannelHeight + channelSpacing) //  - rulerHeight /    ------ 2
             let channelRect = NSRect(
-                x: 0, // channelLabelWidth,
+                x: 0, //  channelLabelWidth,
                 y: yPosition,
                 width: bounds.width , // - channelLabelWidth bounds.width getTotalWidth()
                 height: actualChannelHeight
@@ -490,13 +492,16 @@ class AudioWaveformView: NSView {
 extension AudioWaveformView {
     
     /// Update the intrinsic content size based on duration and zoom
-    
     override var intrinsicContentSize: NSSize {
         let width = getTotalWidth()
         let channelCount = max(1, channelWaveforms.count)
-        // Match the drawing calculation exactly        
-        let height = CGFloat(channelCount) * (minChannelHeight + channelSpacing) + channelSpacing // rulerHeight +
-        return NSSize(width: width, height: max(200, height))
+        
+        // Match the drawing calculation exactly
+        // let minHeight = CGFloat(channelCount) * (minChannelHeight + channelSpacing) + channelSpacing // rulerHeight +
+        let maxHeight = CGFloat(channelCount) * (maxChannelHeight + channelSpacing) + channelSpacing // rulerHeight +
+        let actualHeight = bounds.height
+        
+        return NSSize(width: width, height: max(maxHeight, actualHeight))
     }
     
     /// Call this when zoom changes to update the scroll view
