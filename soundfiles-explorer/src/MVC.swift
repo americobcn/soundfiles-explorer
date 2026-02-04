@@ -106,6 +106,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     
     deinit {
         displayLink?.invalidate()
+        removeObserver(self, forKeyPath: "AudioWaveformViewDidSeek")
+        removeObserver(self, forKeyPath: "AudioPlaybackStateChanged")
     }
     
     
@@ -163,11 +165,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     private func setupMainView() {
         view.frame = NSRect(x: 0, y: 0, width: 1920, height: 1080)
         view.wantsLayer = true
-        
         waveformViewPlayer.wantsLayer = true
         waveformViewPlayer.translatesAutoresizingMaskIntoConstraints = false
-        // waveformViewPlayer.layer?.borderColor = NSColor.green.cgColor
-        // waveformViewPlayer.layer?.borderWidth = 1.0
     }
     
     
@@ -234,11 +233,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         setupControls()
         
         mainStack = NSStackView(frame: waveformViewPlayer.bounds)
-        // scrollView.setFrameSize(mainStack.frame.size)
-        // waveformView.setFrameSize(scrollView.frame.size)
-        
-        mainStack.translatesAutoresizingMaskIntoConstraints = false
         mainStack.wantsLayer = true
+        mainStack.translatesAutoresizingMaskIntoConstraints = false
         mainStack.orientation = .vertical
         mainStack.spacing = 1
         mainStack.addArrangedSubview(scrollView)
@@ -274,7 +270,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             zoomSlider,
             timeLabel
         ])
-        // controlsStackView.translatesAutoresizingMaskIntoConstraints = false
+        controlsStackView.translatesAutoresizingMaskIntoConstraints = false
         controlsStackView.wantsLayer = true
         controlsStackView.orientation = .horizontal
         controlsStackView.spacing = 10
@@ -424,17 +420,11 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                 audioPlaybackManager.pause()
             }
             
-            // Load audioFile to AVAudioPlayer and update waveforms
             Task {
                 waveformView.audioURL = audioFiles[selectedRow].url
-                // await wfv.loadAudio(url: audioFiles[selectedRow].url)
                 await audioPlaybackManager.loadAudioFile(audioFiles[selectedRow].url)
             }
-            // waveformView.updateContentSize()
-            // scrollView.documentView?.setFrameSize(waveformViewPlayer.bounds.size)
-            // scrollView.needsDisplay = true
-            
-                                                
+                                                                    
             #if DEBUG
             // print("\nFILE DESCRIPTION START")
             // print("BEXT: \(String(describing: audioFiles[selectedRow].bext))\n")
@@ -460,7 +450,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             tableView.setDropRow(row, dropOperation: .above)
             return .copy
         }
-                
+
         return []
     }
     
@@ -572,27 +562,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     // MARK: - Keyboard event handlers
     override func keyDown(with event: NSEvent) {
         print("Key Event:\(event)")
-        switch event.modifierFlags {
-        case .command:
-            print("Command Key")
-            switch event.keyCode {
-            case 36: // Return
-                // stopAndGoStartEnd(event.modifierFlags)
-                break
-            default:
-                super.keyDown(with: event)
-            }
-        case .control:
-            switch event.keyCode {
-            case 36: // Return
-                // stopAndGoStartEnd(event.modifierFlags)
-                break
-            default:
-                super.keyDown(with: event)
-            }
-            
-        
-        default:
             switch event.keyCode {
             case 51, 117:
                 deleteSelectedRows()
@@ -606,14 +575,11 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                 playForward()
                 break
             case 36: // Return
-                // stopAndGoStartEnd(event.modifierFlags)
+                stopAndGoStartEnd(event.modifierFlags)
                 break
             default:
                 super.keyDown(with: event)
             }
-            break
-        }
-        
     }
     
     
@@ -646,26 +612,13 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     
 
     @objc private func stopAndGoStartEnd(_ modifier: NSEvent.ModifierFlags) {
-        // guard let player = audioPlayer else { return }
-        // player.stop()
-        let destTime = (modifier.rawValue != 262401) ? CMTime(seconds: 0.0, preferredTimescale: 1)
-                                            : CMTime(seconds: currentAudioDuration.seconds, preferredTimescale: 1)
-        
-        audioPlaybackManager.seek(to: CMTimeGetSeconds(destTime)) { [weak self] finished in
-            DispatchQueue.main.async {
-                if finished {
-                    player.pause()
-                    self?.waveformView.isPlaying = false
-                    print("Seek to \(destTime) seconds completed successfully.")
-                } else {
-                    print("Seek operation was interrupted.")
-                    
-                }
-                // Perform any UI updates or follow-up actions here
-                self?.scrollToFollowPlayback()
-            }
-        }
-                
+        audioPlaybackManager.pause()
+        waveformView.isPlaying = false
+        audioPlaybackManager.isPlaying = false
+        let destTime = (modifier.rawValue != 262401) ? 0.0 : audioPlaybackManager.duration
+        audioPlaybackManager.seek(to: destTime)
+        waveformView.currentTime = destTime
+        scrollToFollowPlayback()
     }
 
     
@@ -834,13 +787,13 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     @objc private func zoomChanged() {
         waveformView.setZoomLevel(CGFloat(zoomSlider.doubleValue))
         waveformView.updateContentSize()
-
     }
     
     @objc private func waveformViewDidSeek(_ notification: Notification) {
         print("Mouse Notification: \(notification)")
         guard let time = (notification.userInfo?["time"] as? TimeInterval) else { return }
-        audioPlaybackManager.seek(to: time)        
+        print("waveformViewDidSeek: \(time)")
+        audioPlaybackManager.seek(to: time)
     }
     
     private func setupNotifications() {
