@@ -21,6 +21,12 @@ struct AudioFileInfo {
     let playerItem: AVPlayerItem
     let waveformData: [[Float]]
     let asbd: AudioStreamBasicDescription
+    let bext: BEXTMetadata?
+    let ixml: IXMLMetadata?
+    let scene: String
+    let take: String
+    let timeCodeStart: String
+    let trackNames: [String: String] = [:]
 }
 
 // MARK: - Audio File Loader
@@ -41,11 +47,15 @@ final class AudioFileLoader {
         }
     }
     
+    private let audioMetadataReader: AudioMetadataReader?
+    private var audioMetadata:AudioMetadata?
+    
     // MARK: - Initialization
     
     init(cacheLimit: Int = 10) {
         waveformCache = NSCache<NSString, WaveformCacheEntry>()
         waveformCache.countLimit = cacheLimit
+        audioMetadataReader = AudioMetadataReader()
     }
     
     // MARK: - Public Methods
@@ -81,7 +91,27 @@ final class AudioFileLoader {
         
         let asbd = asbdPointer
         let bitDepth = Int(asbd.mBitsPerChannel)
+                
+        //Load audio metadata
+        audioMetadata = try audioMetadataReader?.readAudioMetadata(from: url)
         
+        var scene = ""
+        var take = ""
+        var timeCodeStart = ""
+        
+        if let ixml = audioMetadata!.ixml, let bext = audioMetadata!.bext {
+            if let sc = ixml.scene {
+                scene = sc
+            }
+            if let tk = ixml.take {
+                take = tk
+            }
+            let tcr = ixml.parsedData["TIMECODE_RATE"]!.split(separator: "/")
+            if  !tcr.isEmpty {
+                timeCodeStart = timecodeFromTimeReference(samples: Int64(bext.timeReferenceSamples), sampleRate: Double(sampleRate), frameRate: Double(tcr[0])!)
+            }
+        }
+                        
         // Create player item for playback
         let playerItem = AVPlayerItem(asset: asset)
         
@@ -93,7 +123,12 @@ final class AudioFileLoader {
             bitDepth: bitDepth,
             playerItem: playerItem,
             waveformData: waveformData,
-            asbd: asbd
+            asbd: asbd,
+            bext: audioMetadata?.bext,
+            ixml: audioMetadata?.ixml,
+            scene: scene,
+            take: take,
+            timeCodeStart: timeCodeStart
         )
     }
     
@@ -171,4 +206,20 @@ final class AudioFileLoader {
         
         return channelMaxValues
     }
+    
+    func timecodeFromTimeReference(samples: Int64, sampleRate: Double, frameRate: Double) -> String {
+        // Convert samples to seconds
+        let seconds = Double(samples) / sampleRate
+        
+        // Convert seconds to timecode components
+        let totalFrames = Int64(seconds * frameRate)
+        let frames = totalFrames % Int64(frameRate)
+        let secondsTotal = totalFrames / Int64(frameRate)
+        let secs = secondsTotal % 60
+        let mins = (secondsTotal / 60) % 60
+        let hours = secondsTotal / 3600
+        
+        return String(format: "%02d:%02d:%02d:%02d", hours, mins, secs, frames)
+    }
+
 }

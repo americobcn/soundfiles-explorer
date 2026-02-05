@@ -8,51 +8,22 @@
 import Cocoa
 import AVFoundation
 import AVKit
-import QuartzCore
+
 
 // Import the custom classes
 import Foundation
 
 private class AudioFile: NSObject {
     @objc let fileName: String
-    @objc var scene: String
-    @objc var take: String
-    @objc var timeCodeStart: String
-    @objc let duration: Double
-    let url: URL
-    let chCount: Int
-    let bitDepth: Int
-    let sampleRate: Int
-    let trackNames: [String: String] = [:]
-    let bext: BEXTMetadata?
-    let ixml: IXMLMetadata?
-    
-    init(fileName: String,
-         scene: String = "",
-         take: String = "",
-         timeCodeStart: String = "",
-         url: URL, chCount: Int,
-         bitDepth: Int,
-         sampleRate: Int,
-         duration: Double,
-         trackNames: [String: String] = [:],
-         bext: BEXTMetadata?,
-         ixml: IXMLMetadata?
-    ) {
+    let audioFileInfo: AudioFileInfo?
+            
+    init(fileName: String, audioFileInfo: AudioFileInfo) {
         self.fileName = fileName
-        self.scene = scene
-        self.take = take
-        self.url = url
-        self.chCount = chCount
-        self.bitDepth = bitDepth
-        self.sampleRate = sampleRate
-        self.duration = duration
-        self.bext = bext
-        self.ixml = ixml
-        self.timeCodeStart = timeCodeStart
+        self.audioFileInfo = audioFileInfo
         super.init()
     }
 }
+
 
 private enum TableColumnIdentifiers: String, CaseIterable {
     case fileName = "fileName"
@@ -213,8 +184,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         if let durationColumn = tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: TableColumnIdentifiers.duration.rawValue)) {
             durationColumn.sortDescriptorPrototype = duartionSortDescriptor
         }
-        
     }
+    
     
     private func setupPlayer() {
         scrollView = NSScrollView()
@@ -294,6 +265,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         print(indexesToRemove)
         for index in indexesToRemove {
             audioFiles.remove(at: index)
+            backupAudioFiles.remove(at: index)
         }
         
         let selectRow = indexesToRemove.endIndex - 1
@@ -308,7 +280,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             audioFiles = backupAudioFiles
             tableView.reloadData()
         } else {
-            audioFiles = audioFiles.filter { $0.scene.localizedCaseInsensitiveContains(searchField.stringValue) }
+            audioFiles = backupAudioFiles.filter { $0.audioFileInfo!.scene.localizedCaseInsensitiveContains(searchField.stringValue)}
             tableView.reloadData()
         }
     }
@@ -331,44 +303,44 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         case .scene:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].ixml?.scene ?? "")"
+            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.ixml?.scene ?? "")"
             return viewCell
         case .take:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].ixml?.take ?? "")"
+            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.ixml?.take ?? "")"
             return viewCell
         case .takeType:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].ixml?.parsedData["TAKE_TYPE"] ?? "")"
+            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.ixml?.parsedData["TAKE_TYPE"] ?? "")"
             return viewCell
         case .tape:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].ixml?.parsedData["TAPE"] ?? "")"
+            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.ixml?.parsedData["TAPE"] ?? "")"
             return viewCell
         case .timeCodeStart:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = audioFiles[row].timeCodeStart
+            viewCell.textField!.stringValue = audioFiles[row].audioFileInfo!.timeCodeStart
             return viewCell
         case .timeCodeRate:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            let tcr = evaluateTimeCodeRate(expressionString: audioFiles[row].ixml?.parsedData["TIMECODE_RATE"] ?? "0")
-            viewCell.textField!.stringValue = "\(tcr) \(audioFiles[row].ixml?.parsedData["TIMECODE_FLAG"] ?? "")"
+            let tcr = evaluateTimeCodeRate(expressionString: audioFiles[row].audioFileInfo!.ixml?.parsedData["TIMECODE_RATE"] ?? "0")
+            viewCell.textField!.stringValue = "\(tcr) \(audioFiles[row].audioFileInfo!.ixml?.parsedData["TIMECODE_FLAG"] ?? "")"
             return viewCell
         case .channels:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
             // viewCell.textField!.stringValue = "\(audioFiles[row].ixml?.parsedData["TRACK_COUNT"] ?? "")"
-            viewCell.textField!.stringValue = "\(audioFiles[row].chCount)"
+            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.channelCount)"
             return viewCell
         case .circled:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            if let circled = audioFiles[row].ixml?.parsedData["CIRCLED"] {
+            if let circled = audioFiles[row].audioFileInfo!.ixml?.parsedData["CIRCLED"] {
                 switch circled.lowercased() {
                 case "true":
                     viewCell.textField!.stringValue = "√"
@@ -381,22 +353,22 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         case .date:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].bext?.originationDate ?? "")"
+            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.bext?.originationDate ?? "")"
             return viewCell
         case .time:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].bext?.originationTime ?? "")"
+            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.bext?.originationTime ?? "")"
             return viewCell
         case .audioDescription:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].bitDepth)b \(audioFiles[row].sampleRate)Hz"
+            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.bitDepth)b \(audioFiles[row].audioFileInfo!.sampleRate)Hz"
             return viewCell
         case .duration:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            let audioLength = formatTime(audioFiles[row].duration)
+            let audioLength = formatTime(audioFiles[row].audioFileInfo!.duration)
             viewCell.textField!.stringValue = "\(audioLength)"
             return viewCell
         default:
@@ -422,10 +394,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             }
             
             Task {
-                let url = audioFiles[selectedRow].url
-                do {
-                    let fileInfo = try await audioFileLoader.loadAudioFile(url)
-                    
+                if let fileInfo = audioFiles[selectedRow].audioFileInfo {
                     // Update waveform view with pre-generated data
                     waveformView.setWaveformData(
                         fileInfo.waveformData,
@@ -442,8 +411,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                         sampleRate: fileInfo.sampleRate,
                         bitsPerChannel: fileInfo.bitDepth
                     )
-                } catch {
-                    print("Error loading audio file: \(error)")
                 }
             }
                                                                     
@@ -510,52 +477,20 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             notLoadedFiles.removeAll()
             pasteboardObjects.forEach { (object) in
                 if let url = object as? URL {
+                Task {
                     do {
-                        let data = try metadataReader.readAudioMetadata(from: url)
-                        let row = metadataReader.extractTableViewRows(from: data)
-                        for r in row {
-                            print("\(r.category)::\t\(r.field) : \(r.value)")
-                        }
-                        Task {
-                            do {
-                                let fileInfo = try await audioFileLoader.loadAudioFile(url)
-                                let audioFile = AudioFile(fileName: url.deletingPathExtension().lastPathComponent,
-                                                          url: url,
-                                                          chCount: fileInfo.channelCount,
-                                                          bitDepth: fileInfo.bitDepth,
-                                                          sampleRate: Int(fileInfo.sampleRate),
-                                                          duration: fileInfo.duration,
-                                                          bext: data.bext,
-                                                          ixml: data.ixml)
-                                
-                                if let ixml = audioFile.ixml, let bext = audioFile.bext {
-                                    if let sc = ixml.scene {
-                                        audioFile.scene = sc
-                                    }
-                                    if let take = ixml.take {
-                                        audioFile.take = take
-                                    }
-                                    let tcr = ixml.parsedData["TIMECODE_RATE"]!.split(separator: "/")
-                                    if  !tcr.isEmpty {
-                                        audioFile.timeCodeStart = timecodeFromTimeReference(samples: Int64(bext.timeReferenceSamples),
-                                                                                       sampleRate: Double(audioFile.sampleRate),
-                                                                                       frameRate: Double(tcr[0])!
-                                        )
-                                    }
-                                    
-                                }
-                                
-                                self.audioFiles.append(audioFile)
-                                await MainActor.run {
-                                        tableView.reloadData()
-                                }
-                            } catch {
-                                self.notLoadedFiles.append(url.lastPathComponent)
-                            }
+                        let fileInfo = try await audioFileLoader.loadAudioFile(url)
+                        let audioFile = AudioFile(fileName: url.deletingPathExtension().lastPathComponent,
+                                                    audioFileInfo: fileInfo)
+                        self.audioFiles.append(audioFile)
+                        self.backupAudioFiles.append(audioFile)
+                        await MainActor.run {
+                                tableView.reloadData()
                         }
                     } catch {
                         self.notLoadedFiles.append(url.lastPathComponent)
                     }
+                }
                 }
             }
                         
@@ -581,7 +516,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting?
     {
-        return audioFiles[row].url as NSURL
+        return audioFiles[row].audioFileInfo!.url as NSURL
     }
         
 
