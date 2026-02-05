@@ -7,24 +7,13 @@ class AudioWaveformView: NSView {
     
     // MARK: - Properties
     
-    /// The audio file to display
-    var audioURL: URL? {
-        didSet {
-            if let url = audioURL {
-                loadAudioFile(url)
-            }
-        }
-    }
-    
     /// Audio file properties
-     var audioFile: AVAudioFile?
-     var audioFormat: AVAudioFormat?
-     var duration: TimeInterval = 0
-     var sampleRate: Double = 0
+    var duration: TimeInterval = 0
+    var sampleRate: Double = 0
     
     /// Waveform data for each channel
-     var channelWaveforms: [[Float]] = []
-     var channelNames: [String] = []
+    var channelWaveforms: [[Float]] = []
+    var channelNames: [String] = []
     
     /// Playback state
     var currentTime: TimeInterval = 0 {
@@ -111,112 +100,29 @@ class AudioWaveformView: NSView {
     
     
     // MARK: - Audio Loading
-    func loadAudioFile(_ url: URL) {
-        do {
-            audioFile = try AVAudioFile(forReading: url)
-            
-            guard let file = audioFile else {
-                let alert = NSAlert(error: NSError(domain: "Error", code: 0, userInfo: nil))
-                alert.runModal()
-                print("Failed to load audio file")
-                return
-            }
-            
-            let format = file.processingFormat
-            
-            audioFormat = format
-            sampleRate = format.sampleRate
-            duration = Double(file.length) / sampleRate
-            
-            let channelCount = Int(format.channelCount)
-            
-            // Set default channel names
-            channelNames = (0..<channelCount).map { index in
-                switch index {
-                default: return "Channel \(index + 1)"
-                }
-            }
-            
-            // Generate waveforms
-            generateWaveforms(from: file, channelCount: channelCount)
-            needsDisplay = true
-            
-        } catch {
-            print("Error loading audio file: \(error)")
-        }
-    }
     
-    
-    private func generateWaveforms(from file: AVAudioFile, channelCount: Int) {
-        print("Generate Waveforms called")
-
-        // Check cache first
-        let cacheKey = "\(file.url.absoluteString)-\(pixelsPerSecond)" as NSString
-        if let cachedEntry = Self.waveformCache.object(forKey: cacheKey) {
-            channelWaveforms = cachedEntry.waveforms
-            return
+    /// Sets waveform data directly from pre-loaded audio file
+    /// - Parameters:
+    ///   - waveformData: The pre-generated waveform data for each channel
+    ///   - duration: The duration of the audio file in seconds
+    ///   - sampleRate: The sample rate of the audio file
+    ///   - channelCount: The number of audio channels
+    func setWaveformData(_ waveformData: [[Float]], duration: TimeInterval, sampleRate: Double, channelCount: Int) {
+        self.channelWaveforms = waveformData
+        self.duration = duration
+        self.sampleRate = sampleRate
+        
+        // Set default channel names
+        channelNames = (0..<channelCount).map { index in
+            return "Channel \(index + 1)"
         }
-
-        let format = file.processingFormat
-        let totalSamples = Int(file.length)
-
-        // Determine how many samples per pixel for waveform generation
-        let desiredWaveformPoints = Int(duration * Double(pixelsPerSecond))
-        let samplesPerPoint = max(1, totalSamples / desiredWaveformPoints)
-
-        channelWaveforms = Array(repeating: [], count: channelCount)
-
-        // Read audio in chunks
-        let bufferSize: AVAudioFrameCount = 16384
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: bufferSize) else { return }
-
-        var channelMaxValues: [[Float]] = Array(repeating: [], count: channelCount)
-        var sampleCounter = 0
-        var currentMaxes: [Float] = Array(repeating: 0, count: channelCount)
-
-        file.framePosition = 0
-
-        while file.framePosition < file.length {
-            do {
-                try file.read(into: buffer)
-
-                let frameLength = Int(buffer.frameLength)
-
-                for frame in 0..<frameLength {
-                    for channel in 0..<channelCount {
-                        if let channelData = buffer.floatChannelData?[channel] {
-                            let sample = abs(channelData[frame])
-                            currentMaxes[channel] = max(currentMaxes[channel], sample)
-                        }
-                    }
-
-                    sampleCounter += 1
-
-                    if sampleCounter >= samplesPerPoint {
-                        for channel in 0..<channelCount {
-                            channelMaxValues[channel].append(currentMaxes[channel])
-                        }
-                        currentMaxes = Array(repeating: 0, count: channelCount)
-                        sampleCounter = 0
-                    }
-                }
-
-            } catch {
-                print("Error reading audio buffer: \(error)")
-                break
-            }
-        }
-
-        // Store final values
-        for channel in 0..<channelCount {
-            if currentMaxes[channel] > 0 {
-                channelMaxValues[channel].append(currentMaxes[channel])
-            }
-        }
-        channelWaveforms = channelMaxValues
-
-        // Cache the waveform data - NSCache handles eviction automatically
-        Self.waveformCache.setObject(WaveformCacheEntry(waveforms: channelWaveforms), forKey: cacheKey)
+        
+        // Cache the waveform data
+        let cacheKey = "\(duration)-\(sampleRate)-\(channelCount)-\(pixelsPerSecond)" as NSString
+        Self.waveformCache.setObject(WaveformCacheEntry(waveforms: waveformData), forKey: cacheKey)
+        
+        needsDisplay = true
+        updateContentSize()
     }
 
     // MARK: - Drawing
@@ -421,14 +327,14 @@ class AudioWaveformView: NSView {
             context.strokePath()
             
             // Draw cursor triangle at top
-            let trianglePath = NSBezierPath()
-            trianglePath.move(to: NSPoint(x: x, y: bounds.height )) //- rulerHeight
-            trianglePath.line(to: NSPoint(x: x - 6, y: bounds.height  + 15)) //- rulerHeight
-            trianglePath.line(to: NSPoint(x: x + 6, y: bounds.height  + 15)) // - rulerHeight
-            trianglePath.close()
+            // let trianglePath = NSBezierPath()
+            // trianglePath.move(to: NSPoint(x: x, y: bounds.height )) //- rulerHeight
+            // trianglePath.line(to: NSPoint(x: x - 6, y: bounds.height  + 15)) //- rulerHeight
+            // trianglePath.line(to: NSPoint(x: x + 6, y: bounds.height  + 15)) // - rulerHeight
+            // trianglePath.close()
             
             cursorColor.setFill()
-            trianglePath.fill()
+            // trianglePath.fill()
             
             context.restoreGState()
         }

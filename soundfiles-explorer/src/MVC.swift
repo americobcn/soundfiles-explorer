@@ -95,6 +95,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     private var backupAudioFiles: [AudioFile] = []
     private var notLoadedFiles: [String] = []
     private let metadataReader = AudioMetadataReader()
+    private let audioFileLoader = AudioFileLoader()
     private var timeLabel: NSTextField!
     
     
@@ -421,8 +422,29 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             }
             
             Task {
-                waveformView.audioURL = audioFiles[selectedRow].url
-                await audioPlaybackManager.loadAudioFile(audioFiles[selectedRow].url)
+                let url = audioFiles[selectedRow].url
+                do {
+                    let fileInfo = try await audioFileLoader.loadAudioFile(url)
+                    
+                    // Update waveform view with pre-generated data
+                    waveformView.setWaveformData(
+                        fileInfo.waveformData,
+                        duration: fileInfo.duration,
+                        sampleRate: fileInfo.sampleRate,
+                        channelCount: fileInfo.channelCount
+                    )
+                    
+                    // Update playback manager with player item
+                    audioPlaybackManager.setPlayerItem(
+                        fileInfo.playerItem,
+                        duration: Float64(fileInfo.duration),
+                        channelCount: fileInfo.channelCount,
+                        sampleRate: fileInfo.sampleRate,
+                        bitsPerChannel: fileInfo.bitDepth
+                    )
+                } catch {
+                    print("Error loading audio file: \(error)")
+                }
             }
                                                                     
             #if DEBUG
@@ -495,36 +517,40 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                             print("\(r.category)::\t\(r.field) : \(r.value)")
                         }
                         Task {
-                            let (asbd, duration) = try await loadAudioBasicDescription(for: url)
-                            let audioFile = AudioFile(fileName: url.deletingPathExtension().lastPathComponent,
-                                                      url: url,
-                                                      chCount: Int(asbd.mChannelsPerFrame),
-                                                      bitDepth: Int(asbd.mBitsPerChannel),
-                                                      sampleRate: Int(asbd.mSampleRate),
-                                                      duration: duration,
-                                                      bext: data.bext,
-                                                      ixml: data.ixml)
-                            
-                            if let ixml = audioFile.ixml, let bext = audioFile.bext {
-                                if let sc = ixml.scene {
-                                    audioFile.scene = sc
-                                }
-                                if let take = ixml.take {
-                                    audioFile.take = take
-                                }
-                                let tcr = ixml.parsedData["TIMECODE_RATE"]!.split(separator: "/")
-                                if  !tcr.isEmpty {
-                                    audioFile.timeCodeStart = timecodeFromTimeReference(samples: Int64(bext.timeReferenceSamples),
-                                                                                   sampleRate: Double(audioFile.sampleRate),
-                                                                                   frameRate: Double(tcr[0])!
-                                    )
+                            do {
+                                let fileInfo = try await audioFileLoader.loadAudioFile(url)
+                                let audioFile = AudioFile(fileName: url.deletingPathExtension().lastPathComponent,
+                                                          url: url,
+                                                          chCount: fileInfo.channelCount,
+                                                          bitDepth: fileInfo.bitDepth,
+                                                          sampleRate: Int(fileInfo.sampleRate),
+                                                          duration: fileInfo.duration,
+                                                          bext: data.bext,
+                                                          ixml: data.ixml)
+                                
+                                if let ixml = audioFile.ixml, let bext = audioFile.bext {
+                                    if let sc = ixml.scene {
+                                        audioFile.scene = sc
+                                    }
+                                    if let take = ixml.take {
+                                        audioFile.take = take
+                                    }
+                                    let tcr = ixml.parsedData["TIMECODE_RATE"]!.split(separator: "/")
+                                    if  !tcr.isEmpty {
+                                        audioFile.timeCodeStart = timecodeFromTimeReference(samples: Int64(bext.timeReferenceSamples),
+                                                                                       sampleRate: Double(audioFile.sampleRate),
+                                                                                       frameRate: Double(tcr[0])!
+                                        )
+                                    }
+                                    
                                 }
                                 
-                            }
-                            
-                            self.audioFiles.append(audioFile)
-                            await MainActor.run {
-                                    tableView.reloadData()
+                                self.audioFiles.append(audioFile)
+                                await MainActor.run {
+                                        tableView.reloadData()
+                                }
+                            } catch {
+                                self.notLoadedFiles.append(url.lastPathComponent)
                             }
                         }
                     } catch {
@@ -623,24 +649,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
 
     
     //MARK: - Helpers Functions
-    func loadAudioBasicDescription(for url: URL) async throws -> (AudioStreamBasicDescription, Float64) {
-        let loadOptions = [AVURLAssetPreferPreciseDurationAndTimingKey: true]
-        let asset = AVURLAsset(url: url, options: loadOptions)
-        
-        guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
-            throw AudioParserError.noAudioTrack
-        }
-        
-        guard let asbd = try await track.load(.formatDescriptions).first?.audioFormatList.first?.mASBD else {
-            throw AudioParserError.malformedMetadata
-        }
-        
-        let dr = try await asset.load(.duration)
-        let duration = CMTimeGetSeconds(dr)
-        return (asbd, duration)
-      }
-
-    
     func timecodeFromTimeReference(samples: Int64, sampleRate: Double, frameRate: Double) -> String {
         // Convert samples to seconds
         let seconds = Double(samples) / sampleRate

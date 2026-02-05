@@ -59,52 +59,28 @@ class AudioPlaybackManager: NSObject {
 
     // MARK: - Public Methods
 
-    /// Load an audio file for playback
-    func loadAudioFile(_ url: URL) async {
-        let options = [AVURLAssetPreferPreciseDurationAndTimingKey: true]
-        let asset = AVURLAsset(url: url, options: options)
-        let item = AVPlayerItem(asset: asset)
-
+    /// Set the player item for playback
+    func setPlayerItem(_ item: AVPlayerItem, duration: Float64, channelCount: Int, sampleRate: Double, bitsPerChannel: Int) {
         // Remove previous observer if exists
         if isObserving, let observer = currentTimeObserver {
             player?.removeTimeObserver(observer)
             isObserving = false
         }
 
-        // player = AVPlayer(playerItem: item)
         player?.replaceCurrentItem(with: item)
-        do {
-            let assetDuration = try await asset.load(.duration)
-            duration = CMTimeGetSeconds(assetDuration)
-            
-            // Get channels count
-            let assetTracks = try await asset.load(.tracks)
-            let track = assetTracks.first(where: { $0.mediaType == .audio })!
-            
-             let formatDescriptions = try await track.load(.formatDescriptions)
-            guard let audioFormatDesc = formatDescriptions.first,
-            let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(audioFormatDesc)
-            else { return }
-            channelCount = Int(asbd.pointee.mChannelsPerFrame)
-            sampleRate = Double(asbd.pointee.mSampleRate)
-            bitsPerChannel = Int(asbd.pointee.mBitsPerChannel)
-            
-            print("AudioPlaybackManager: Loaded audio")
-            print("Duration: \(duration)")
-            print("Channel count: \(channelCount)")
-            print("SampleRate: \(sampleRate)")
-            print("Bits depth: \(bitsPerChannel)")
-
-        } catch {
-            let alert = NSAlert()
-            alert.messageText = "Error: \(error)"
-            alert.informativeText = "Failed to load duration"
-            alert.runModal()
-        }
         
+        // Store audio properties
+        self.duration = duration
+        self.channelCount = channelCount
+        self.sampleRate = sampleRate
+        self.bitsPerChannel = bitsPerChannel
         
+        print("AudioPlaybackManager: Set player item")
+        print("Duration: \(duration)")
+        print("Channel count: \(channelCount)")
+        print("SampleRate: \(sampleRate)")
+        print("Bits depth: \(bitsPerChannel)")
         
-                                
         // Add time observer on background queue to avoid blocking main thread
         let processingQueue = DispatchQueue(label: "com.audio.timeObserver", qos: .userInitiated)
         currentTimeObserver = player?.addPeriodicTimeObserver(forInterval: CMTimeMake(value: 1, timescale: 30), queue: processingQueue) { [weak self] time in

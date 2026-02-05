@@ -3,7 +3,7 @@ import AVFoundation
 
 // MARK: - Audio File Information Helper
 
-struct AudioFileInfo {
+struct AudioFileInfoHelper {
     let url: URL
     let duration: TimeInterval
     let sampleRate: Double
