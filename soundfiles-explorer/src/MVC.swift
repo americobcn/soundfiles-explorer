@@ -603,6 +603,15 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             case 36: // Return
                 stopAndGoStartEnd(event.modifierFlags)
                 break
+            /// Zoom
+            case 15: // R
+                zoomSlider.doubleValue = zoomSlider.doubleValue * 0.75
+                waveformView.setZoomLevel(zoomSlider.doubleValue)
+                break
+            case 17: // T
+                zoomSlider.doubleValue = zoomSlider.doubleValue * 1.25
+                waveformView.setZoomLevel(zoomSlider.doubleValue)
+                break
             default:
                 super.keyDown(with: event)
             }
@@ -708,34 +717,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     }
     
     
-    // MARK: - AVAudioPlayer Methods
-/*
-    func loadAudioURL(_ url: URL) {
-        // Setup audio player
-        do {
-            // audioPlayer = try AVAudioPlayer(contentsOf: url)
-            // audioPlayer?.prepareToPlay()
-            // audioPlayer?.volume = 1.0
-            // audioPlayer?.enableRate = true
-            let asset = AVAsset(url: url)
-            let item = AVPlayerItem(asset: asset)
-            // self.audioPlayer.replaceCurrentItem(with: item)
-            self.currentAudioDuration = item.duration
-            
-            // You can customize channel names based on your audio file
-            // For example, if you know the file has specific channels:
-            // waveformView.setChannelNames(["Boom Mic", "Lav 1", "Lav 2", "Ambient"])
-            
-        } catch {
-            let alert = NSAlert()
-            alert.messageText = "Error Loading Audio"
-            alert.informativeText = error.localizedDescription
-            alert.alertStyle = .warning
-            alert.runModal()
-        }
-    }
-*/
-    
+    // MARK: - Methods
     private func setupDisplayLink() {
         displayLink = self.view.displayLink(target: self, selector: #selector(updatePlaybackPosition))
         displayLink?.isPaused = true

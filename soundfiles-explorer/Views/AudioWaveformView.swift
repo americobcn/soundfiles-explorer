@@ -75,11 +75,7 @@ class AudioWaveformView: NSView {
         }
     }
 
-    /// Waveform caching - Class-level cache
-    // private static var waveformCache: [String: [[Float]]] = [:]
-    // private static let cacheSizeLimit = 10 // Limit number of cached waveforms
-    
-    
+            
     // MARK: - Initialization
     
     override init(frame frameRect: NSRect) {
