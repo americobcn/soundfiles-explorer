@@ -137,6 +137,10 @@ guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
 - Async/await for asynchronous operations
 - Private nested classes for file-local types
 
+### Auto Layout
+- Use `NSLayoutConstraint.activate([...])` for batch constraint activation
+- Set `translatesAutoresizingMaskIntoConstraints = false` for programmatic UI
+
 ### Key Files
 - `MVC.swift`: Main view controller
 - `AudioMetadataReader.swift`: BEXT/iXML parsing
