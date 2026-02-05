@@ -63,7 +63,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
 
     private var displayLink: CADisplayLink?
     private var audioFiles: [AudioFile] = []
-    private var backupAudioFiles: [AudioFile] = []
+    private var displayedIndices: [Int] = []
+    private var filterPredicate: String = ""
     private var notLoadedFiles: [String] = []
     private let metadataReader = AudioMetadataReader()
     private let audioFileLoader = AudioFileLoader()
@@ -93,6 +94,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         setupNotifications()
         
         searchField.delegate = self
+        applyFilter() // Initialize displayedIndices
     }
 
     override func viewDidAppear() {
@@ -260,91 +262,105 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         // Ensure there is something to delete
         guard !selectedIndexes.isEmpty else { return }
         
-        // Convert to an array and delete items from the data source
-        let indexesToRemove = selectedIndexes.sorted(by: >) // Sort in descending order
-        print(indexesToRemove)
-        for index in indexesToRemove {
+        // Map displayed row indices to actual audioFiles indices
+        let actualIndicesToRemove = selectedIndexes.map { displayedIndices[$0] }.sorted(by: >)
+        
+        // Remove from audioFiles (in descending order to maintain correct indices)
+        for index in actualIndicesToRemove {
             audioFiles.remove(at: index)
-            backupAudioFiles.remove(at: index)
         }
         
-        let selectRow = indexesToRemove.endIndex - 1
-        tableView.removeRows(at: selectedIndexes, withAnimation: .effectFade)
-        tableView.selectRowIndexes(IndexSet([selectRow]), byExtendingSelection: false)
+        // Re-apply filter to update displayedIndices
+        applyFilter()
+        
+        let selectRow = min(selectedIndexes.first!, displayedIndices.count - 1)
+        tableView.reloadData()
+        if displayedIndices.count > 0 {
+            tableView.selectRowIndexes(IndexSet([max(0, selectRow)]), byExtendingSelection: false)
+        }
     }
 
     
     func controlTextDidChange(_ obj: Notification) {
         guard obj.object as? NSSearchField == searchField else { return }
-        if searchField.stringValue.isEmpty {
-            audioFiles = backupAudioFiles
-            tableView.reloadData()
+        filterPredicate = searchField.stringValue
+        applyFilter()
+        tableView.reloadData()
+    }
+    
+    private func applyFilter() {
+        if filterPredicate.isEmpty {
+            displayedIndices = Array(0..<audioFiles.count)
         } else {
-            audioFiles = backupAudioFiles.filter { $0.audioFileInfo!.scene.localizedCaseInsensitiveContains(searchField.stringValue)}
-            tableView.reloadData()
+            displayedIndices = audioFiles.enumerated()
+                .filter { $0.element.audioFileInfo?.scene.localizedCaseInsensitiveContains(filterPredicate) ?? false }
+                .map { $0.offset }
         }
     }
     
     
     // MARK: - NSTableViewDataSource methods
     func numberOfRows(in tableView: NSTableView) -> Int {
-        audioFiles.count
+        return displayedIndices.count
     }
     
+    private func audioFileAt(row: Int) -> AudioFile {
+        return audioFiles[displayedIndices[row]]
+    }
     
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let colIdentifier = tableColumn?.identifier else { return nil }
+        let audioFile = audioFileAt(row: row)
+        
         switch TableColumnIdentifiers(rawValue: colIdentifier.rawValue) {
         case .fileName:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].fileName)"
+            viewCell.textField!.stringValue = "\(audioFile.fileName)"
             return viewCell
         case .scene:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.ixml?.scene ?? "")"
+            viewCell.textField!.stringValue = "\(audioFile.audioFileInfo?.ixml?.scene ?? "")"
             return viewCell
         case .take:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.ixml?.take ?? "")"
+            viewCell.textField!.stringValue = "\(audioFile.audioFileInfo?.ixml?.take ?? "")"
             return viewCell
         case .takeType:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.ixml?.parsedData["TAKE_TYPE"] ?? "")"
+            viewCell.textField!.stringValue = "\(audioFile.audioFileInfo?.ixml?.parsedData["TAKE_TYPE"] ?? "")"
             return viewCell
         case .tape:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.ixml?.parsedData["TAPE"] ?? "")"
+            viewCell.textField!.stringValue = "\(audioFile.audioFileInfo?.ixml?.parsedData["TAPE"] ?? "")"
             return viewCell
         case .timeCodeStart:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = audioFiles[row].audioFileInfo!.timeCodeStart
+            viewCell.textField!.stringValue = audioFile.audioFileInfo?.timeCodeStart ?? ""
             return viewCell
         case .timeCodeRate:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            let tcr = evaluateTimeCodeRate(expressionString: audioFiles[row].audioFileInfo!.ixml?.parsedData["TIMECODE_RATE"] ?? "0")
-            viewCell.textField!.stringValue = "\(tcr) \(audioFiles[row].audioFileInfo!.ixml?.parsedData["TIMECODE_FLAG"] ?? "")"
+            let tcr = evaluateTimeCodeRate(expressionString: audioFile.audioFileInfo?.ixml?.parsedData["TIMECODE_RATE"] ?? "0")
+            viewCell.textField!.stringValue = "\(tcr) \(audioFile.audioFileInfo?.ixml?.parsedData["TIMECODE_FLAG"] ?? "")"
             return viewCell
         case .channels:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            // viewCell.textField!.stringValue = "\(audioFiles[row].ixml?.parsedData["TRACK_COUNT"] ?? "")"
-            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.channelCount)"
+            viewCell.textField!.stringValue = "\(audioFile.audioFileInfo?.channelCount ?? 0)"
             return viewCell
         case .circled:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            if let circled = audioFiles[row].audioFileInfo!.ixml?.parsedData["CIRCLED"] {
+            if let circled = audioFile.audioFileInfo?.ixml?.parsedData["CIRCLED"] {
                 switch circled.lowercased() {
                 case "true":
                     viewCell.textField!.stringValue = "√"
-                    break
                 default:
                     viewCell.textField!.stringValue = ""
                 }
@@ -353,22 +369,22 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         case .date:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.bext?.originationDate ?? "")"
+            viewCell.textField!.stringValue = "\(audioFile.audioFileInfo?.bext?.originationDate ?? "")"
             return viewCell
         case .time:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.bext?.originationTime ?? "")"
+            viewCell.textField!.stringValue = "\(audioFile.audioFileInfo?.bext?.originationTime ?? "")"
             return viewCell
         case .audioDescription:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFiles[row].audioFileInfo!.bitDepth)b \(audioFiles[row].audioFileInfo!.sampleRate)Hz"
+            viewCell.textField!.stringValue = "\(audioFile.audioFileInfo?.bitDepth ?? 0)b \(audioFile.audioFileInfo?.sampleRate ?? 0)Hz"
             return viewCell
         case .duration:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            let audioLength = formatTime(audioFiles[row].audioFileInfo!.duration)
+            let audioLength = formatTime(audioFile.audioFileInfo?.duration ?? 0)
             viewCell.textField!.stringValue = "\(audioLength)"
             return viewCell
         default:
@@ -376,25 +392,19 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         }
     }
     
-    func tableView(_ tableView: NSTableView, draggingSession session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
-        if operation == .copy {
-            print("Copy audioFiles to backp")
-            backupAudioFiles.append(contentsOf: audioFiles)
-        }
-    }
-    
-    
     // MARK: - TableView Delegate Methods
     func tableViewSelectionDidChange(_ notification: Notification) {
         let tableView = notification.object as! NSTableView
         let selectedRow = tableView.selectedRow
-        if selectedRow != -1 {
+        if selectedRow != -1 && selectedRow < displayedIndices.count {
             if audioPlaybackManager.isPlaying {
                 audioPlaybackManager.pause()
             }
             
+            let actualIndex = displayedIndices[selectedRow]
+            
             Task {
-                if let fileInfo = audioFiles[selectedRow].audioFileInfo {
+                if let fileInfo = audioFiles[actualIndex].audioFileInfo {
                     // Update waveform view with pre-generated data
                     waveformView.setWaveformData(
                         fileInfo.waveformData,
@@ -416,9 +426,9 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                                                                     
             #if DEBUG
             // print("\nFILE DESCRIPTION START")
-            // print("BEXT: \(String(describing: audioFiles[selectedRow].bext))\n")
-            // print("iXML(parsedData): \(String(describing: audioFiles[selectedRow].ixml?.parsedData))")
-            // print("iXML(rawData): \(audioFiles[selectedRow].ixml?.rawXML ?? "")")
+            // print("BEXT: \(String(describing: audioFiles[actualIndex].bext))\n")
+            // print("iXML(parsedData): \(String(describing: audioFiles[actualIndex].ixml?.parsedData))")
+            // print("iXML(rawData): \(audioFiles[actualIndex].ixml?.rawXML ?? "")")
             // print("FILE DESCRIPTION END\n")
             #endif
         }
@@ -452,6 +462,9 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     {
         // Moved row on tableview
         if info.draggingSource as? NSTableView == tableView {
+            // Disable internal reordering when filtering is active
+            guard filterPredicate.isEmpty else { return false }
+            
             guard let sourceRow = tableView.selectedRowIndexes.first else {
                 return false
             }
@@ -483,9 +496,9 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                         let audioFile = AudioFile(fileName: url.deletingPathExtension().lastPathComponent,
                                                     audioFileInfo: fileInfo)
                         self.audioFiles.append(audioFile)
-                        self.backupAudioFiles.append(audioFile)
                         await MainActor.run {
-                                tableView.reloadData()
+                            self.applyFilter()
+                            self.tableView.reloadData()
                         }
                     } catch {
                         self.notLoadedFiles.append(url.lastPathComponent)
@@ -510,13 +523,14 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         let sortedArray = NSMutableArray(array: audioFiles)
         sortedArray.sort(using: tableView.sortDescriptors)
         audioFiles = sortedArray as! [AudioFile]
+        applyFilter() // Re-apply filter after sorting
         tableView.reloadData()
     }
 
     
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting?
     {
-        return audioFiles[row].audioFileInfo!.url as NSURL
+        return audioFileAt(row: row).audioFileInfo?.url as NSURL? ?? NSURL()
     }
         
 
