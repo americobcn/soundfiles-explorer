@@ -12,7 +12,8 @@ import CoreMedia
 // MARK: - Audio File Info
 
 /// Consolidated information about a loaded audio file
-struct AudioFileInfo {
+
+class AudioFileInfo: NSObject {
     let url: URL
     let duration: TimeInterval
     let sampleRate: Double
@@ -27,6 +28,36 @@ struct AudioFileInfo {
     let take: String
     let timeCodeStart: String
     let trackNames: [String: String] = [:]
+    
+    init(url: URL, duration: TimeInterval,
+         sampleRate: Double,
+         channelCount: Int,
+         bitDepth: Int,
+         playerItem: AVPlayerItem,
+         waveformData: [[Float]],
+         asbd: AudioStreamBasicDescription,
+         bext: BEXTMetadata?,
+         ixml: IXMLMetadata?,
+         scene: String = "",
+         take: String = "",
+         timeCodeStart: String = "",
+         trackNames: [String: String]
+    ) {
+        
+        self.url = url
+        self.duration = duration
+        self.sampleRate = sampleRate
+        self.channelCount = channelCount
+        self.bitDepth = bitDepth
+        self.playerItem = playerItem
+        self.waveformData = waveformData
+        self.asbd = asbd
+        self.bext = bext
+        self.ixml = ixml
+        self.scene = scene
+        self.take = take
+        self.timeCodeStart = timeCodeStart        
+    }
 }
 
 // MARK: - Audio File Loader
@@ -75,8 +106,10 @@ final class AudioFileLoader {
         let duration = Double(audioFile.length) / sampleRate
         
         // Generate or retrieve cached waveform data
+        
         let waveformData = try await generateWaveforms(from: audioFile, url: url)
         
+                                
         // Create AVURLAsset and extract ASBD for playback and metadata
         let loadOptions = [AVURLAssetPreferPreciseDurationAndTimingKey: true]
         let asset = AVURLAsset(url: url, options: loadOptions)
@@ -98,7 +131,7 @@ final class AudioFileLoader {
         var scene = ""
         var take = ""
         var timeCodeStart = ""
-        
+        var tracksNames = [String: String]()
         if let ixml = audioMetadata!.ixml, let bext = audioMetadata!.bext {
             if let sc = ixml.scene {
                 scene = sc
@@ -106,12 +139,16 @@ final class AudioFileLoader {
             if let tk = ixml.take {
                 take = tk
             }
+            for t in ixml.tracks.enumerated() {
+                tracksNames["\(t.element.index)"] = t.element.name
+            }
+            print("Tarcks: \(tracksNames)")
             let tcr = ixml.parsedData["TIMECODE_RATE"]!.split(separator: "/")
             if  !tcr.isEmpty {
                 timeCodeStart = timecodeFromTimeReference(samples: Int64(bext.timeReferenceSamples), sampleRate: Double(sampleRate), frameRate: Double(tcr[0])!)
             }
         }
-                        
+                    
         // Create player item for playback
         let playerItem = AVPlayerItem(asset: asset)
         
@@ -128,7 +165,8 @@ final class AudioFileLoader {
             ixml: audioMetadata?.ixml,
             scene: scene,
             take: take,
-            timeCodeStart: timeCodeStart
+            timeCodeStart: timeCodeStart,
+            trackNames: tracksNames
         )
     }
     

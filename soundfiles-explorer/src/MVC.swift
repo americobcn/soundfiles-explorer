@@ -9,17 +9,22 @@ import Cocoa
 import AVFoundation
 import AVKit
 
-
 // Import the custom classes
 import Foundation
 
 private class AudioFile: NSObject {
     @objc let fileName: String
-    let audioFileInfo: AudioFileInfo?
+    @objc let scene: String
+    @objc let take: String
+    @objc let date: String
+    @objc let audioFileInfo: AudioFileInfo?
             
     init(fileName: String, audioFileInfo: AudioFileInfo) {
         self.fileName = fileName
         self.audioFileInfo = audioFileInfo
+        self.scene = audioFileInfo.scene
+        self.take = audioFileInfo.take
+        self.date = audioFileInfo.bext?.originationDate ?? ""
         super.init()
     }
 }
@@ -47,7 +52,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     // MARK: - Outlets
     @IBOutlet weak var tableView: NSTableView!
     @IBOutlet weak var searchField: NSSearchField!
-    // @IBOutlet weak var playerView: AVPlayerView!
     @IBOutlet weak var waveformViewPlayer: NSView!
     
     // MARK: - Variables
