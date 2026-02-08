@@ -33,9 +33,9 @@ class AudioPlaybackManager: NSObject {
     }
 
     // Basic Audio Info
-    var channelCount: Int = 0
-    var sampleRate: Double = 0
-    var bitsPerChannel: Int = 0
+    // var channelCount: Int = 0
+    // var sampleRate: Double = 0
+    // var bitsPerChannel: Int = 0
     var duration: Float64 = 0
         
     var rate: Float {
@@ -60,7 +60,7 @@ class AudioPlaybackManager: NSObject {
     // MARK: - Public Methods
 
     /// Set the player item for playback
-    func setPlayerItem(_ item: AVPlayerItem, duration: Float64, channelCount: Int, sampleRate: Double, bitsPerChannel: Int) {
+    func setPlayerItem(_ item: AVPlayerItem, duration: Float64) { // , channelCount: Int, sampleRate: Double, bitsPerChannel: Int
         // Remove previous observer if exists
         if isObserving, let observer = currentTimeObserver {
             player?.removeTimeObserver(observer)
@@ -71,15 +71,15 @@ class AudioPlaybackManager: NSObject {
         
         // Store audio properties
         self.duration = duration
-        self.channelCount = channelCount
-        self.sampleRate = sampleRate
-        self.bitsPerChannel = bitsPerChannel
+        // self.channelCount = channelCount
+        // self.sampleRate = sampleRate
+        // self.bitsPerChannel = bitsPerChannel
         
-        print("AudioPlaybackManager: Set player item")
-        print("Duration: \(duration)")
-        print("Channel count: \(channelCount)")
-        print("SampleRate: \(sampleRate)")
-        print("Bits depth: \(bitsPerChannel)")
+        // print("AudioPlaybackManager: Set player item")
+        // print("Duration: \(duration)")
+        // print("Channel count: \(channelCount)")
+        // print("SampleRate: \(sampleRate)")
+        // print("Bits depth: \(bitsPerChannel)")
         
         // Add time observer on background queue to avoid blocking main thread
         let processingQueue = DispatchQueue(label: "com.audio.timeObserver", qos: .userInitiated)

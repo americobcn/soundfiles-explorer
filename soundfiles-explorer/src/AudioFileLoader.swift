@@ -14,49 +14,57 @@ import CoreMedia
 /// Consolidated information about a loaded audio file
 
 class AudioFileInfo: NSObject {
-    let url: URL
-    let duration: TimeInterval
+    @objc let fileName: String
+    @objc let url: URL
+    @objc let duration: TimeInterval
     let sampleRate: Double
     let channelCount: Int
     let bitDepth: Int
     let playerItem: AVPlayerItem
     let waveformData: [[Float]]
+    @objc let scene: String
+    @objc let take: String
+    @objc let date: String
+    @objc let timeCodeStart: String
+    let tracksNames: [Int: String]
     let asbd: AudioStreamBasicDescription
     let bext: BEXTMetadata?
     let ixml: IXMLMetadata?
-    let scene: String
-    let take: String
-    let timeCodeStart: String
-    let trackNames: [String: String] = [:]
     
-    init(url: URL, duration: TimeInterval,
+    init(url: URL,
+         fileName: String,
+         duration: TimeInterval,
          sampleRate: Double,
          channelCount: Int,
          bitDepth: Int,
          playerItem: AVPlayerItem,
          waveformData: [[Float]],
-         asbd: AudioStreamBasicDescription,
-         bext: BEXTMetadata?,
-         ixml: IXMLMetadata?,
          scene: String = "",
          take: String = "",
+         date: String = "",
          timeCodeStart: String = "",
-         trackNames: [String: String]
+         tracksNames: [Int: String],
+         asbd: AudioStreamBasicDescription,
+         bext: BEXTMetadata?,
+         ixml: IXMLMetadata?
     ) {
-        
         self.url = url
+        self.fileName = fileName
         self.duration = duration
         self.sampleRate = sampleRate
         self.channelCount = channelCount
         self.bitDepth = bitDepth
         self.playerItem = playerItem
         self.waveformData = waveformData
+        self.scene = scene
+        self.take = take
+        self.date = date
+        self.timeCodeStart = timeCodeStart
+        self.tracksNames = tracksNames
         self.asbd = asbd
         self.bext = bext
         self.ixml = ixml
-        self.scene = scene
-        self.take = take
-        self.timeCodeStart = timeCodeStart        
+        super.init()
     }
 }
 
@@ -83,7 +91,7 @@ final class AudioFileLoader {
     
     // MARK: - Initialization
     
-    init(cacheLimit: Int = 10) {
+    init(cacheLimit: Int = 1000) {
         waveformCache = NSCache<NSString, WaveformCacheEntry>()
         waveformCache.countLimit = cacheLimit
         audioMetadataReader = AudioMetadataReader()
@@ -130,43 +138,47 @@ final class AudioFileLoader {
         
         var scene = ""
         var take = ""
+        var date = ""
         var timeCodeStart = ""
-        var tracksNames = [String: String]()
+        var tracksNames = [Int: String]()
         if let ixml = audioMetadata!.ixml, let bext = audioMetadata!.bext {
-            if let sc = ixml.scene {
-                scene = sc
-            }
-            if let tk = ixml.take {
-                take = tk
-            }
-            for t in ixml.tracks.enumerated() {
-                tracksNames["\(t.element.index)"] = t.element.name
-            }
-            print("Tarcks: \(tracksNames)")
+            date = bext.originationDate
+            scene = ixml.scene ?? ""
+            take = ixml.take ?? ""
+                                                            
             let tcr = ixml.parsedData["TIMECODE_RATE"]!.split(separator: "/")
             if  !tcr.isEmpty {
-                timeCodeStart = timecodeFromTimeReference(samples: Int64(bext.timeReferenceSamples), sampleRate: Double(sampleRate), frameRate: Double(tcr[0])!)
+                timeCodeStart = timecodeFromTimeReference(samples: Int64(bext.timeReferenceSamples),
+                                                          sampleRate: Double(sampleRate),
+                                                          frameRate: Double(tcr[0])!
+                )
+            }
+            ///Get tracks index and names
+            for t in ixml.tracks.enumerated() {
+                tracksNames[t.element.index] = t.element.name
             }
         }
-                    
-        // Create player item for playback
+        
+        /// Create player item for playback
         let playerItem = AVPlayerItem(asset: asset)
         
         return AudioFileInfo(
             url: url,
+            fileName: url.deletingPathExtension().lastPathComponent,
             duration: duration,
             sampleRate: sampleRate,
             channelCount: channelCount,
             bitDepth: bitDepth,
             playerItem: playerItem,
             waveformData: waveformData,
-            asbd: asbd,
-            bext: audioMetadata?.bext,
-            ixml: audioMetadata?.ixml,
             scene: scene,
             take: take,
+            date: date,
             timeCodeStart: timeCodeStart,
-            trackNames: tracksNames
+            tracksNames: tracksNames,
+            asbd: asbd,
+            bext: audioMetadata?.bext,
+            ixml: audioMetadata?.ixml
         )
     }
     
@@ -194,7 +206,7 @@ final class AudioFileLoader {
         var channelMaxValues: [[Float]] = Array(repeating: [], count: channelCount)
         
         // Read audio in chunks
-        let bufferSize: AVAudioFrameCount = 16384
+        let bufferSize: AVAudioFrameCount = 32768
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: bufferSize) else {
             throw AudioParserError.malformedMetadata
         }
@@ -239,11 +251,15 @@ final class AudioFileLoader {
             }
         }
         
-        // Cache the waveform data
-        waveformCache.setObject(WaveformCacheEntry(waveforms: channelMaxValues), forKey: cacheKey)
+        // Reverse channel order so Channel 1 appears at top (highest y-position in macOS coordinate system)
+        let reversedChannels = channelMaxValues.reversed()
         
-        return channelMaxValues
+        // Cache the waveform data
+        waveformCache.setObject(WaveformCacheEntry(waveforms: Array(reversedChannels)), forKey: cacheKey)
+        
+        return Array(reversedChannels)
     }
+    
     
     func timecodeFromTimeReference(samples: Int64, sampleRate: Double, frameRate: Double) -> String {
         // Convert samples to seconds

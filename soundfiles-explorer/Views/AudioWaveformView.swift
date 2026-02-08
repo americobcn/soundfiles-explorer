@@ -11,6 +11,7 @@ class AudioWaveformView: NSView {
     var duration: TimeInterval = 0
     var sampleRate: Double = 0
     
+    
     /// Waveform data for each channel
     var channelWaveforms: [[Float]] = []
     var channelNames: [String] = []
@@ -58,9 +59,10 @@ class AudioWaveformView: NSView {
     /// Layout constants
     private let rulerHeight: CGFloat = 20
     private let channelSpacing: CGFloat = 1
-    private let channelLabelWidth: CGFloat = 0
-    private let minChannelHeight: CGFloat = 40
-    private let maxChannelHeight: CGFloat = 80
+    private let channelLabelWidth: CGFloat = 100
+    private let minChannelHeight: CGFloat = 60
+    private let maxChannelHeight: CGFloat = 100
+    private var channelHeight: CGFloat = 60
 
     /// Zoom and scroll
     var pixelsPerSecond: CGFloat = 100 {
@@ -92,6 +94,7 @@ class AudioWaveformView: NSView {
                 
     private func setupView() {
         wantsLayer = true
+        translatesAutoresizingMaskIntoConstraints = false        
     }
     
     
@@ -103,15 +106,22 @@ class AudioWaveformView: NSView {
     ///   - duration: The duration of the audio file in seconds
     ///   - sampleRate: The sample rate of the audio file
     ///   - channelCount: The number of audio channels
-    func setWaveformData(_ waveformData: [[Float]], duration: TimeInterval, sampleRate: Double, channelCount: Int) {
+    func setWaveformData(_ waveformData: [[Float]], duration: TimeInterval, sampleRate: Double, channelCount: Int, names: [Int: String]) {
         self.channelWaveforms = waveformData
         self.duration = duration
         self.sampleRate = sampleRate
         
-        // Set default channel names
-        channelNames = (0..<channelCount).map { index in
-            return "Channel \(index + 1)"
+        channelNames = Array(repeating: "", count: channelCount)
+        for (idx, _) in channelWaveforms.enumerated() {
+            if names[idx + 1] != nil && names[idx + 1]?.isEmpty == false {
+                channelNames[idx] = "\(names[idx + 1]!)\nCh \(idx + 1)"
+            } else {
+                channelNames[idx] = "Ch \(idx + 1)"
+            }
         }
+        
+        /// Reverse channel to match waveforms channels order
+        channelNames = channelNames.reversed()
         
         // Cache the waveform data
         let cacheKey = "\(duration)-\(sampleRate)-\(channelCount)-\(pixelsPerSecond)" as NSString
@@ -121,16 +131,19 @@ class AudioWaveformView: NSView {
         updateContentSize()
     }
 
+    
     // MARK: - Drawing
     
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        // print("bounds: \(bounds), frame: \(frame), intrinsicContentSize: \(intrinsicContentSize)")
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         
         // Draw background
         backgroundColor.setFill()
         context.fill(bounds)
+        
+        // Draw Time ruler
+        // drawTimeRuler(in: context)
         
         // Calculate layout
         let channelCount = channelWaveforms.count
@@ -138,36 +151,28 @@ class AudioWaveformView: NSView {
             drawEmptyState(in: context)
             return
         }
-                
-        
-        // let channelHeight = (CGFloat(channelCount) * (minChannelHeight + channelSpacing) + channelSpacing) / CGFloat(channelCount)
-        // let actualChannelHeight = max(channelHeight, minChannelHeight)
-        
-        let availableHeight = bounds.height
-        let totalSpacing = CGFloat(channelCount + 1) * channelSpacing
-        let channelHeight = (availableHeight - totalSpacing) / CGFloat(channelCount)
-        let actualChannelHeight = max(channelHeight, minChannelHeight)
+                                                
         
         // Draw each channel
         for (index, waveform) in channelWaveforms.enumerated() {
-            let yPosition = channelSpacing + CGFloat(index) * (actualChannelHeight + channelSpacing) //  - rulerHeight /    ------ 2
+            let yPosition = channelSpacing + CGFloat(index) * (channelHeight + channelSpacing) //  - rulerHeight /    ------ 2
             let channelRect = NSRect(
-                x: 0, //  channelLabelWidth,
+                x: channelLabelWidth, //  ,
                 y: yPosition,
-                width: bounds.width , // - channelLabelWidth bounds.width getTotalWidth()
-                height: actualChannelHeight
+                width: bounds.width - channelLabelWidth , // - channelLabelWidth bounds.width getTotalWidth()
+                height: channelHeight
             )
             
             // Draw channel background
             NSColor(calibratedWhite: 0.1, alpha: 1.0).setFill()
             context.fill(channelRect)
             
-            // Draw channel label
-            // drawChannelLabel(channelNames[index], at: NSPoint(x: 5, y: yPosition + actualChannelHeight / 2), in: context)
-            
             // Draw waveform
             let color = waveformColors[index % waveformColors.count]
             drawWaveform(waveform, in: channelRect, color: color, context: context)
+            
+            // Draw channel label
+            drawChannelLabel(channelNames[index], at: NSPoint(x: 8, y: yPosition + channelHeight / 2), in: context)
         }
         
         // Draw playback cursor
@@ -220,7 +225,7 @@ class AudioWaveformView: NSView {
         var time = firstMarker
         
         while time <= endTime {
-            let x = CGFloat(time - startTime) * pixelsPerSecond  // channelLabelWidth +
+            let x = channelLabelWidth + CGFloat(time - startTime) * pixelsPerSecond  //
             
             if x >= channelLabelWidth && x <= bounds.width {
                 // Draw tick
@@ -246,7 +251,7 @@ class AudioWaveformView: NSView {
         }
     }
     
-    private func drawChannelLabel(_ label: String, at point: NSPoint, in context: CGContext) {
+    private func drawChannelLabel(_ label: String, at point: NSPoint, in context: CGContext) {        
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 11, weight: .medium),
             .foregroundColor: textColor
@@ -255,6 +260,7 @@ class AudioWaveformView: NSView {
         let attributedString = NSAttributedString(string: label, attributes: attributes)
         let size = attributedString.size()
         attributedString.draw(at: NSPoint(x: point.x, y: point.y - size.height / 2))
+        
     }
     
     
@@ -309,7 +315,7 @@ class AudioWaveformView: NSView {
         guard duration > 0 else { return }
         
         let startTime = TimeInterval(scrollOffset / pixelsPerSecond)
-        let x = CGFloat(currentTime - startTime) * pixelsPerSecond // channelLabelWidth +
+        let x = channelLabelWidth + CGFloat(currentTime - startTime) * pixelsPerSecond //
         
         // Only draw if cursor is visible
         if x >= channelLabelWidth && x <= bounds.width {
@@ -338,6 +344,19 @@ class AudioWaveformView: NSView {
     
     // MARK: - Helper Methods
     
+    func setChannelHeight() -> CGFloat {
+        guard channelNames.count > 0 else { return 200 }
+        
+        let availableHeight = bounds.height // - rulerHeight
+        let totalSpacing = CGFloat(channelWaveforms.count + 1) * channelSpacing
+        let height = (availableHeight - totalSpacing) / CGFloat(channelWaveforms.count)
+        channelHeight = max(minChannelHeight, min(height, maxChannelHeight))
+        let viewHeight = CGFloat(channelWaveforms.count) * channelHeight + totalSpacing
+        updateContentSize()
+        return viewHeight
+    }
+    
+    
     private func formatTime(_ time: TimeInterval) -> String {
         let hours = Int(time) / 3600
         let minutes = (Int(time) % 3600) / 60
@@ -354,8 +373,15 @@ class AudioWaveformView: NSView {
     // MARK: - Public Methods
     
     /// Set custom channel names
-    func setChannelNames(_ names: [String]) {
-        channelNames = names
+    func setChannelNames(_ names: [Int: String], channelCount: Int) {
+        channelNames = Array(repeating: "", count: channelCount)
+        for (idx, _) in channelNames.enumerated() {
+            if names[idx] != nil {
+                channelNames[idx] = names[idx]!
+            } else {
+                channelNames[idx] = "Channel \(idx)"
+            }
+        }
         needsDisplay = true
     }
     
