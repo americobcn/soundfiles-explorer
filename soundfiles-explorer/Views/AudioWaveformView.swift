@@ -14,7 +14,7 @@ class AudioWaveformView: NSView {
     
     /// Waveform data for each channel
     var channelWaveforms: [[Float]] = []
-    var channelNames: [String] = []
+    private(set) var channelNames: [String] = []
     
     /// Playback state
     var currentTime: TimeInterval = 0 {
@@ -59,10 +59,10 @@ class AudioWaveformView: NSView {
     /// Layout constants
     private let rulerHeight: CGFloat = 20
     private let channelSpacing: CGFloat = 1
-    private let channelLabelWidth: CGFloat = 100
+    // let channelLabelWidth: CGFloat = 0
     private let minChannelHeight: CGFloat = 60
     private let maxChannelHeight: CGFloat = 100
-    private var channelHeight: CGFloat = 60
+    private(set) var channelHeight: CGFloat = 60
 
     /// Zoom and scroll
     var pixelsPerSecond: CGFloat = 100 {
@@ -94,7 +94,7 @@ class AudioWaveformView: NSView {
                 
     private func setupView() {
         wantsLayer = true
-        translatesAutoresizingMaskIntoConstraints = false        
+        translatesAutoresizingMaskIntoConstraints = false
     }
     
     
@@ -119,9 +119,7 @@ class AudioWaveformView: NSView {
                 channelNames[idx] = "Ch \(idx + 1)"
             }
         }
-        
-        /// Reverse channel to match waveforms channels order
-        channelNames = channelNames.reversed()
+                        
         
         // Cache the waveform data
         let cacheKey = "\(duration)-\(sampleRate)-\(channelCount)-\(pixelsPerSecond)" as NSString
@@ -151,15 +149,14 @@ class AudioWaveformView: NSView {
             drawEmptyState(in: context)
             return
         }
-                                                
         
         // Draw each channel
         for (index, waveform) in channelWaveforms.enumerated() {
-            let yPosition = channelSpacing + CGFloat(index) * (channelHeight + channelSpacing) //  - rulerHeight /    ------ 2
+            let yPosition = channelSpacing + CGFloat(index) * (channelHeight + channelSpacing)
             let channelRect = NSRect(
-                x: channelLabelWidth, //  ,
+                x: 0, // channelLabelWidth
                 y: yPosition,
-                width: bounds.width - channelLabelWidth , // - channelLabelWidth bounds.width getTotalWidth()
+                width: bounds.width, // - channelLabelWidth
                 height: channelHeight
             )
             
@@ -170,9 +167,6 @@ class AudioWaveformView: NSView {
             // Draw waveform
             let color = waveformColors[index % waveformColors.count]
             drawWaveform(waveform, in: channelRect, color: color, context: context)
-            
-            // Draw channel label
-            drawChannelLabel(channelNames[index], at: NSPoint(x: 8, y: yPosition + channelHeight / 2), in: context)
         }
         
         // Draw playback cursor
@@ -225,9 +219,9 @@ class AudioWaveformView: NSView {
         var time = firstMarker
         
         while time <= endTime {
-            let x = channelLabelWidth + CGFloat(time - startTime) * pixelsPerSecond  //
+            let x = CGFloat(time - startTime) * pixelsPerSecond  // channelLabelWidth +
             
-            if x >= channelLabelWidth && x <= bounds.width {
+            if  x <= bounds.width { // x >= channelLabelWidth &&
                 // Draw tick
                 gridColor.setStroke()
                 context.setLineWidth(1)
@@ -315,10 +309,10 @@ class AudioWaveformView: NSView {
         guard duration > 0 else { return }
         
         let startTime = TimeInterval(scrollOffset / pixelsPerSecond)
-        let x = channelLabelWidth + CGFloat(currentTime - startTime) * pixelsPerSecond //
+        let x = CGFloat(currentTime - startTime) * pixelsPerSecond // channelLabelWidth +
         
         // Only draw if cursor is visible
-        if x >= channelLabelWidth && x <= bounds.width {
+        if  x <= bounds.width {  // x >= channelLabelWidth &&
             context.saveGState()
             
             // Draw cursor line
@@ -328,15 +322,7 @@ class AudioWaveformView: NSView {
             context.addLine(to: CGPoint(x: x, y: bounds.height)) //  - rulerHeight
             context.strokePath()
             
-            // Draw cursor triangle at top
-            // let trianglePath = NSBezierPath()
-            // trianglePath.move(to: NSPoint(x: x, y: bounds.height )) //- rulerHeight
-            // trianglePath.line(to: NSPoint(x: x - 6, y: bounds.height  + 15)) //- rulerHeight
-            // trianglePath.line(to: NSPoint(x: x + 6, y: bounds.height  + 15)) // - rulerHeight
-            // trianglePath.close()
-            
             cursorColor.setFill()
-            // trianglePath.fill()
             
             context.restoreGState()
         }
@@ -344,16 +330,16 @@ class AudioWaveformView: NSView {
     
     // MARK: - Helper Methods
     
-    func setChannelHeight() -> CGFloat {
-        guard channelNames.count > 0 else { return 200 }
+    func setChannelHeight() {
+        guard channelNames.count > 0 else { return  }
         
         let availableHeight = bounds.height // - rulerHeight
         let totalSpacing = CGFloat(channelWaveforms.count + 1) * channelSpacing
         let height = (availableHeight - totalSpacing) / CGFloat(channelWaveforms.count)
         channelHeight = max(minChannelHeight, min(height, maxChannelHeight))
-        let viewHeight = CGFloat(channelWaveforms.count) * channelHeight + totalSpacing
+        // let viewHeight = CGFloat(channelWaveforms.count) * channelHeight + totalSpacing
         updateContentSize()
-        return viewHeight
+        // return viewHeight
     }
     
     
@@ -392,16 +378,15 @@ class AudioWaveformView: NSView {
     
     /// Get the total width needed for the waveform
     func getTotalWidth() -> CGFloat {
-        return CGFloat(duration) * pixelsPerSecond + channelLabelWidth
+        return CGFloat(duration) * pixelsPerSecond // + channelLabelWidth
     }
         
     // MARK: - Mouse Interaction
     
     override func mouseDown(with event: NSEvent) {
         let location = convert(event.locationInWindow, from: nil)
-        if location.x >= channelLabelWidth {
-            // let startTime = TimeInterval(scrollOffset / pixelsPerSecond)
-            let clickedTime =  TimeInterval((location.x - channelLabelWidth) / pixelsPerSecond) // startTime +
+        if location.x >= 0 {
+            let clickedTime =  TimeInterval((location.x) / pixelsPerSecond) // - channelLabelWidth
             currentTime = max(0, min(duration, clickedTime))
             
             // Notify delegate or post notification for seeking
@@ -424,12 +409,11 @@ extension AudioWaveformView {
         let width = getTotalWidth()
         let channelCount = max(1, channelWaveforms.count)
         
-        // Match the drawing calculation exactly
-        // let minHeight = CGFloat(channelCount) * (minChannelHeight + channelSpacing) + channelSpacing // rulerHeight +
-        let maxHeight = CGFloat(channelCount) * (maxChannelHeight + channelSpacing) + channelSpacing // rulerHeight +
-        let actualHeight = bounds.height
+        // Calculate height based on actual channel height
+        let totalSpacing = CGFloat(channelCount + 1) * channelSpacing
+        let calculatedHeight = CGFloat(channelCount) * channelHeight + totalSpacing
         
-        return NSSize(width: width, height: max(maxHeight, actualHeight))
+        return NSSize(width: width, height: calculatedHeight)
     }
     
     /// Call this when zoom changes to update the scroll view

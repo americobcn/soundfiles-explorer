@@ -46,6 +46,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     private var playPauseButton: NSButton!
     private var zoomSlider: NSSlider!
     private var mainStack: NSStackView!
+    private var channelLabelsContainer: NSStackView!
+    private var channelLabelViews: [NSTextField] = []
 
 
     private var displayLink: CADisplayLink?
@@ -56,7 +58,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     private let metadataReader = AudioMetadataReader()
     private let audioFileLoader = AudioFileLoader()
     private var timeLabel: NSTextField!
-    
+    private var channelLabelWidth: CGFloat = 100
     
     // MARK: - Init
     required init?(coder: NSCoder) {
@@ -105,11 +107,15 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             mainStack.bottomAnchor.constraint(equalTo: waveformViewPlayer.bottomAnchor)
         ])
         
+        // Find the waveformContainer (first arranged subview of mainStack)
+        guard let waveformContainer = mainStack.arrangedSubviews.first else { return }
+        
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: mainStack.topAnchor),
-            scrollView.leadingAnchor.constraint(equalTo: mainStack.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
-            controlsStackView.bottomAnchor.constraint(equalTo: searchField.topAnchor, constant: -10),
+            waveformContainer.topAnchor.constraint(equalTo: mainStack.topAnchor),
+            waveformContainer.leadingAnchor.constraint(equalTo: mainStack.leadingAnchor),
+            waveformContainer.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
+            controlsStackView.topAnchor.constraint(equalTo: waveformContainer.bottomAnchor),
+            controlsStackView.bottomAnchor.constraint(equalTo: mainStack.bottomAnchor),
             controlsStackView.heightAnchor.constraint(equalToConstant: 48)
         ])
                                                                                         
@@ -200,7 +206,25 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         waveformView.translatesAutoresizingMaskIntoConstraints = false
         
         scrollView.documentView = waveformView
-        scrollView.documentView?.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Setup channel labels container
+        channelLabelsContainer = NSStackView()
+        channelLabelsContainer.wantsLayer = true
+        channelLabelsContainer.translatesAutoresizingMaskIntoConstraints = false
+        channelLabelsContainer.orientation = .vertical
+        channelLabelsContainer.spacing = 1
+        channelLabelsContainer.widthAnchor.constraint(equalToConstant: channelLabelWidth).isActive = true
+        channelLabelsContainer.layer?.backgroundColor = NSColor(calibratedWhite: 0.15, alpha: 1.0).cgColor
+        channelLabelsContainer.setContentHuggingPriority(NSLayoutConstraint.Priority.required, for: .horizontal)
+        channelLabelsContainer.setContentCompressionResistancePriority(NSLayoutConstraint.Priority.required, for: .horizontal)
+        
+        // Create horizontal stack for labels + waveform
+        let waveformContainer = NSStackView()
+        waveformContainer.translatesAutoresizingMaskIntoConstraints = false
+        waveformContainer.orientation = .horizontal
+        waveformContainer.spacing = 1
+        waveformContainer.addArrangedSubview(channelLabelsContainer)
+        waveformContainer.addArrangedSubview(scrollView)
                 
         setupControls()
         
@@ -209,7 +233,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         mainStack.translatesAutoresizingMaskIntoConstraints = false
         mainStack.orientation = .vertical
         mainStack.spacing = 1
-        mainStack.addArrangedSubview(scrollView)
+        mainStack.addArrangedSubview(waveformContainer)
         mainStack.addArrangedSubview(controlsStackView)
         
         waveformViewPlayer.addSubview(mainStack)
@@ -411,8 +435,10 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                                              channelCount: fileInfo.channelCount,
                                              names: fileInfo.tracksNames
                 )
-                let waveformViewHeight = waveformView.setChannelHeight()
-                scrollView.documentView?.setFrameSize(NSSize(width: waveformView.frame.width, height: waveformViewHeight))
+                                
+                waveformView.setChannelHeight()
+                // Update channel labels
+                setupChannelLabels()
                 
                 // Update playback manager with player item
                 audioPlaybackManager.setPlayerItem(fileInfo.playerItem, duration: Float64(fileInfo.duration))
@@ -754,5 +780,55 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         let seconds = Int(time) % 60
         let milliseconds = Int((time.truncatingRemainder(dividingBy: 1)) * 100)
         return String(format: "%d:%02d.%02d", minutes, seconds, milliseconds)
+    }
+    
+    // MARK: - Channel Labels
+    
+    /// Creates and updates channel labels in the fixed container view
+    private func setupChannelLabels() {
+        // Remove existing labels from stack view properly
+        channelLabelViews.forEach {
+            channelLabelsContainer.removeArrangedSubview($0)
+            $0.removeFromSuperview()
+        }
+        channelLabelViews.removeAll()
+        
+        // Get channel info from waveform view
+        let channelNames = waveformView.channelNames
+        let channelHeight = waveformView.channelHeight
+        let channelSpacing = CGFloat(1) // Match AudioWaveformView
+        
+        guard !channelNames.isEmpty else { return }
+        
+        // Create labels for each channel
+        for (_, channelName) in channelNames.enumerated() {
+            let label = NSTextField(labelWithString: channelName)
+            label.font = NSFont.systemFont(ofSize: 11, weight: .regular)
+            label.textColor = NSColor.white
+            label.alignment = NSTextAlignment.left
+            label.isEditable = false
+            label.isBordered = true
+            label.translatesAutoresizingMaskIntoConstraints = false
+            label.setContentHuggingPriority(NSLayoutConstraint.Priority.required, for: NSLayoutConstraint.Orientation.vertical)
+            label.setContentCompressionResistancePriority(NSLayoutConstraint.Priority.required, for: NSLayoutConstraint.Orientation.vertical)
+            
+            // Add height constraint
+            label.heightAnchor.constraint(equalToConstant: channelHeight).isActive = true
+            label.widthAnchor.constraint(equalToConstant: channelLabelWidth).isActive = true
+            
+            channelLabelViews.append(label)
+            channelLabelsContainer.addArrangedSubview(label)
+        }
+        
+        // Set container spacing to match waveform view
+        channelLabelsContainer.spacing = channelSpacing
+        
+        // Ensure stack view has proper hugging priority
+        channelLabelsContainer.setContentHuggingPriority(.defaultHigh, for: .vertical)
+        channelLabelsContainer.setContentCompressionResistancePriority(.required, for: .vertical)
+        
+        // Force layout update
+        channelLabelsContainer.needsLayout = true
+        channelLabelsContainer.needsDisplay = true
     }
 }
