@@ -187,8 +187,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             durationColumn.sortDescriptorPrototype = duartionSortDescriptor
         }
     }
-    
-    
+        
     private func setupPlayer() {
         scrollView = NSScrollView()
         scrollView.wantsLayer = true
@@ -196,12 +195,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         scrollView.autoresizingMask = [.width, .height]
         scrollView.hasHorizontalScroller = true
         scrollView.hasVerticalScroller = true
-        scrollView.autohidesScrollers = false
-        
-        rulerView = NSRulerView(scrollView: scrollView, orientation: .horizontalRuler)
-        rulerView.translatesAutoresizingMaskIntoConstraints = false
-        rulerView.isHorizontalContentSizeConstraintActive = true
-        
+        scrollView.autohidesScrollers = true
+                        
         waveformView = AudioWaveformView()
         waveformView.translatesAutoresizingMaskIntoConstraints = false
         
@@ -223,6 +218,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         waveformContainer.translatesAutoresizingMaskIntoConstraints = false
         waveformContainer.orientation = .horizontal
         waveformContainer.spacing = 1
+        waveformContainer.alignment = .top
         waveformContainer.addArrangedSubview(channelLabelsContainer)
         waveformContainer.addArrangedSubview(scrollView)
                 
@@ -436,7 +432,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                                              names: fileInfo.tracksNames
                 )
                                 
-                waveformView.setChannelHeight()
+                // waveformView.setChannelHeight()
+                
                 // Update channel labels
                 setupChannelLabels()
                 
@@ -823,9 +820,13 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         // Set container spacing to match waveform view
         channelLabelsContainer.spacing = channelSpacing
         
-        // Ensure stack view has proper hugging priority
-        channelLabelsContainer.setContentHuggingPriority(.defaultHigh, for: .vertical)
-        channelLabelsContainer.setContentCompressionResistancePriority(.required, for: .vertical)
+        // Set distribution to fill from top
+        channelLabelsContainer.distribution = .fill
+        channelLabelsContainer.alignment = .leading
+        
+        // Set hugging priority to prevent stretching in parent horizontal stack view
+        channelLabelsContainer.setContentHuggingPriority(NSLayoutConstraint.Priority.required, for: NSLayoutConstraint.Orientation.vertical)
+        channelLabelsContainer.setContentCompressionResistancePriority(NSLayoutConstraint.Priority.required, for: NSLayoutConstraint.Orientation.vertical)
         
         // Force layout update
         channelLabelsContainer.needsLayout = true

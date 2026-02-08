@@ -95,6 +95,8 @@ class AudioWaveformView: NSView {
     private func setupView() {
         wantsLayer = true
         translatesAutoresizingMaskIntoConstraints = false
+        layer?.borderColor = NSColor.red.cgColor
+        layer?.borderWidth = 1
     }
     
     
@@ -150,9 +152,13 @@ class AudioWaveformView: NSView {
             return
         }
         
+        // Calculate starting Y to attach channels to top when content fits
+        let totalContentHeight = intrinsicContentSize.height
+        let startY = max(0, bounds.height - totalContentHeight)
+        
         // Draw each channel
         for (index, waveform) in channelWaveforms.enumerated() {
-            let yPosition = channelSpacing + CGFloat(index) * (channelHeight + channelSpacing)
+            let yPosition = startY + channelSpacing + CGFloat(index) * (channelHeight + channelSpacing)
             let channelRect = NSRect(
                 x: 0, // channelLabelWidth
                 y: yPosition,
@@ -421,7 +427,12 @@ extension AudioWaveformView {
         invalidateIntrinsicContentSize()
         needsDisplay = true
     }
+    
+    override var isFlipped: Bool {
+        return true
+    }
 }
+
 
 // MARK: - Waveform Caching
 

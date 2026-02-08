@@ -250,14 +250,11 @@ final class AudioFileLoader {
                 channelMaxValues[channel].append(currentMaxes[channel])
             }
         }
-        
-        // Reverse channel order so Channel 1 appears at top (highest y-position in macOS coordinate system)
-        let reversedChannels = channelMaxValues.reversed()
-        
+                        
         // Cache the waveform data
-        waveformCache.setObject(WaveformCacheEntry(waveforms: Array(reversedChannels)), forKey: cacheKey)
+        waveformCache.setObject(WaveformCacheEntry(waveforms: Array(channelMaxValues)), forKey: cacheKey)
         
-        return Array(reversedChannels)
+        return Array(channelMaxValues)
     }
     
     
