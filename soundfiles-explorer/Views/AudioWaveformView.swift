@@ -80,6 +80,10 @@ class AudioWaveformView: NSView {
     /// Layer for playback cursor (updated frequently)
     private var cursorLayer: CALayer?
     
+    /// Layer for ruler
+    private var rulerLayer: CALayer?
+    private var needsRulerUpdate = true
+    
     /// Flag to track if waveform layer needs update
     private var needsWaveformUpdate = true
 
@@ -101,18 +105,23 @@ class AudioWaveformView: NSView {
     private func setupView() {
         wantsLayer = true
         translatesAutoresizingMaskIntoConstraints = false
-        layer?.zPosition = 0
+        layer?.zPosition = 1
+        
         // Create waveform layer for static content
         waveformLayer = CALayer()
         waveformLayer?.zPosition = 10
-        // waveformLayer?.borderWidth = 1.0
         layer?.addSublayer(waveformLayer!)
         
         // Create cursor layer for playback cursor
         cursorLayer = CALayer()
-        cursorLayer?.zPosition = 100 // Ensure cursor is on top
+        cursorLayer?.zPosition = 50 // Ensure cursor is on top
         cursorLayer?.backgroundColor = NSColor.init(calibratedRed: 1.0, green: 0, blue: 0, alpha: 1).cgColor
-        layer?.addSublayer(cursorLayer!)        
+        layer?.addSublayer(cursorLayer!)
+        
+        rulerLayer = CALayer()
+        rulerLayer?.zPosition = 100
+        rulerLayer?.backgroundColor = NSColor.darkGray.cgColor
+        layer?.addSublayer(rulerLayer!)
     }
     
     
@@ -166,6 +175,11 @@ class AudioWaveformView: NSView {
             renderWaveformLayer()
         }
         
+        // Render waveform layer if needed
+        if needsRulerUpdate {
+            // drawTimeRuler()
+        }
+        
         // Update cursor layer (always update on draw)
         updateCursorLayer()
     }
@@ -187,8 +201,25 @@ class AudioWaveformView: NSView {
         attributedString.draw(at: point)
     }
     
-    private func drawTimeRuler(in context: CGContext) {
-        let rulerRect = NSRect(x: 0, y: self.bounds.height, width: bounds.width , height: rulerHeight) //
+    private func drawTimeRuler() {
+        guard waveformLayer != nil else { return }
+        
+        // Get full content dimensions for scrolling
+        let fullContentWidth = getTotalWidth()
+        let rulerRect = NSRect(x: 0, y: self.bounds.height, width: fullContentWidth , height: rulerHeight) //
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
+        
+        guard let context = CGContext(
+            data: nil,
+            width: Int(fullContentWidth),
+            height: Int(rulerHeight),
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ) else { return }
+        
         
         // Draw ruler background
         NSColor(calibratedWhite: 0.2, alpha: 1.0).setFill()
@@ -239,9 +270,12 @@ class AudioWaveformView: NSView {
             
             time += markerInterval
         }
+        
+        needsRulerUpdate = true
     }
     
-    private func drawChannelLabel(_ label: String, at point: NSPoint, in context: CGContext) {        
+    
+    private func drawChannelLabel(_ label: String, at point: NSPoint, in context: CGContext) {
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 11, weight: .medium),
             .foregroundColor: textColor
@@ -290,13 +324,13 @@ class AudioWaveformView: NSView {
         color.setFill()
         path.fill()
         
+        
         // Draw center line
         // gridColor.setStroke()
         // context.setLineWidth(0.0)
         // context.move(to: CGPoint(x: rect.minX, y: midY))
         // context.addLine(to: CGPoint(x: rect.maxX, y: midY))
         // context.strokePath()
-        
         context.restoreGState()
         
     }

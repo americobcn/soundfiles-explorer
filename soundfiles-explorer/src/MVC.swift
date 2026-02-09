@@ -614,7 +614,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         audioPlaybackManager.pause()
         waveformView.isPlaying = false
         audioPlaybackManager.isPlaying = false
-        let destTime = (modifier.rawValue != 262401) ? 0.0 : audioPlaybackManager.duration
+        // Use proper modifier flag detection instead of magic number
+        let destTime = modifier.contains(.control) ? audioPlaybackManager.duration : 0.0
         audioPlaybackManager.seek(to: destTime)
         waveformView.currentTime = destTime
         
@@ -622,7 +623,9 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         let newX = destTime <= 0 ? 0.0 : destTime * waveformView.pixelsPerSecond
         scrollView.contentView.scroll(to: NSPoint(x: newX, y: visibleRect.minY))
         scrollView.reflectScrolledClipView(scrollView.contentView)
-        updatePlaybackPosition()
+        // Note: Don't call updatePlaybackPosition() here - it would overwrite
+        // waveformView.currentTime with the player's current time before the seek completes.
+        // The displayLink will update the position once the seek finishes.
     }
 
     
