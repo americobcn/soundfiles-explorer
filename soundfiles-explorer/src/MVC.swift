@@ -9,6 +9,7 @@ import Cocoa
 import AVFoundation
 import AVKit
 
+
 // Import the custom classes
 import Foundation
 
@@ -39,7 +40,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     // MARK: - Variables
     private var audioPlaybackManager: AudioPlaybackManager!
     private var waveformView: AudioWaveformView!
-    private var rulerView: NSView!
 
     private var scrollView: NSScrollView!
     private var controlsStackView: NSStackView!
@@ -48,7 +48,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     private var mainStack: NSStackView!
     private var channelLabelsContainer: NSStackView!
     private var channelLabelViews: [NSTextField] = []
-
 
     private var displayLink: CADisplayLink?
     private var audioFiles: [AudioFileInfo] = []
@@ -69,7 +68,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     deinit {
         displayLink?.invalidate()
         removeObserver(self, forKeyPath: "AudioWaveformViewDidSeek")
-        removeObserver(self, forKeyPath: "AudioPlaybackStateChanged")
+        removeObserver(self, forKeyPath: "AudioPlaybackStateChanged")        
     }
     
     
@@ -201,7 +200,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         waveformView.translatesAutoresizingMaskIntoConstraints = false
         
         scrollView.documentView = waveformView
-        
+                
         // Setup channel labels container
         channelLabelsContainer = NSStackView()
         channelLabelsContainer.wantsLayer = true
@@ -215,13 +214,16 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         
         // Create horizontal stack for labels + waveform
         let waveformContainer = NSStackView()
+        waveformContainer.wantsLayer = true
         waveformContainer.translatesAutoresizingMaskIntoConstraints = false
         waveformContainer.orientation = .horizontal
         waveformContainer.spacing = 1
         waveformContainer.alignment = .top
         waveformContainer.addArrangedSubview(channelLabelsContainer)
         waveformContainer.addArrangedSubview(scrollView)
-                
+        waveformContainer.layer?.borderColor = NSColor.gray.cgColor
+        waveformContainer.layer?.borderWidth = 1.0
+        
         setupControls()
         
         mainStack = NSStackView(frame: waveformViewPlayer.bounds)
@@ -231,7 +233,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         mainStack.spacing = 1
         mainStack.addArrangedSubview(waveformContainer)
         mainStack.addArrangedSubview(controlsStackView)
-        
+            
         waveformViewPlayer.addSubview(mainStack)
     }
     
@@ -315,6 +317,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                 .map { $0.offset }
         }
     }
+        
     
     
     // MARK: - NSTableViewDataSource methods
@@ -423,7 +426,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             
             Task {
                 let fileInfo = audioFiles[actualIndex]
-                print("Tracks: \(fileInfo.tracksNames)")
                 // Update waveform view with pre-generated data
                 waveformView.setWaveformData(fileInfo.waveformData,
                                              duration: fileInfo.duration,
@@ -431,9 +433,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                                              channelCount: fileInfo.channelCount,
                                              names: fileInfo.tracksNames
                 )
-                                
-                // waveformView.setChannelHeight()
-                
+                                                                
                 // Update channel labels
                 setupChannelLabels()
                 
@@ -617,7 +617,12 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         let destTime = (modifier.rawValue != 262401) ? 0.0 : audioPlaybackManager.duration
         audioPlaybackManager.seek(to: destTime)
         waveformView.currentTime = destTime
-        scrollToFollowPlayback()
+        
+        let visibleRect = scrollView.documentVisibleRect
+        let newX = destTime <= 0 ? 0.0 : destTime * waveformView.pixelsPerSecond
+        scrollView.contentView.scroll(to: NSPoint(x: newX, y: visibleRect.minY))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        updatePlaybackPosition()
     }
 
     
@@ -683,24 +688,21 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     
     // MARK: - Methods
     private func setupDisplayLink() {
-        displayLink = self.view.displayLink(target: self, selector: #selector(updatePlaybackPosition))
+        displayLink = self.waveformView.displayLink(target: self, selector: #selector(updatePlaybackPosition))
+        displayLink?.preferredFrameRateRange = CAFrameRateRange(minimum: 1/60.0, maximum: 1/30.0, preferred: 1/30.0)
         displayLink?.isPaused = true
         displayLink?.add(to: .main, forMode: .common)
     }
  
-    private var lastUpdateTime: CFTimeInterval = 0
-    private let updateInterval: CFTimeInterval = 1.0 / 60.0 // Update at 30fps max
-
+    // private var lastUpdateTime: CFTimeInterval = 0
+    // private let updateInterval: CFTimeInterval = 1.0 / 30.0 // Update at 30fps max
+    
     @objc private func updatePlaybackPosition() {
-        let currentTime = CACurrentMediaTime()
-
+        // let currentTime = CACurrentMediaTime()
         // Rate limit updates to prevent excessive CPU usage
-        if currentTime - lastUpdateTime < updateInterval {
-            return
-        }
-
-        lastUpdateTime = currentTime
-
+        // if currentTime - lastUpdateTime < updateInterval { return }
+        // lastUpdateTime = currentTime
+        
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.waveformView.currentTime = audioPlaybackManager.getCurrentTime()
@@ -709,21 +711,9 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         }
     }
     
-    private func updateTimeLabel() {
-        guard let audioPlaybackManager else {
-            timeLabel.stringValue = "0:00.00 / 0:00.00"
-            return
-        }
-                
-        let current = formatTime(audioPlaybackManager.currentTime)
-        let total = formatTime(audioPlaybackManager.duration)        
-        
-        timeLabel.stringValue = "\(current) / \(total)"
-    }
-        
     private func scrollToFollowPlayback() {
         let visibleRect = scrollView.documentVisibleRect
-        let cursorX = CGFloat(audioPlaybackManager.currentTime) * waveformView.pixelsPerSecond // 120 +
+        let cursorX = CGFloat(audioPlaybackManager.currentTime) * waveformView.pixelsPerSecond
         
         // Scroll if cursor is near the edges or outside visible area
         let scrollMargin: CGFloat = 100
@@ -738,16 +728,29 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     }
     
     
+    
+    private func updateTimeLabel() {
+        guard let audioPlaybackManager else {
+            timeLabel.stringValue = "0:00.00 / 0:00.00"
+            return
+        }
+                
+        let current = formatTime(audioPlaybackManager.currentTime)
+        let total = formatTime(audioPlaybackManager.duration)        
+        
+        timeLabel.stringValue = "\(current) / \(total)"
+    }
+        
+            
     @objc private func zoomChanged() {
         waveformView.setZoomLevel(CGFloat(zoomSlider.doubleValue))
         waveformView.updateContentSize()
     }
     
     @objc private func waveformViewDidSeek(_ notification: Notification) {
-        print("Mouse Notification: \(notification)")
         guard let time = (notification.userInfo?["time"] as? TimeInterval) else { return }
-        print("waveformViewDidSeek: \(time)")
         audioPlaybackManager.seek(to: time)
+        
     }
     
     private func setupNotifications() {

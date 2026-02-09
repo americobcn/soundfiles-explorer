@@ -11,7 +11,7 @@ macOS audio file explorer built with Swift and AppKit. Parses BEXT/iXML metadata
 ## Build Commands
 
 ```bash
-# Build the application (Release)
+# Build (Release)
 xcodebuild -project soundfiles-explorer.xcodeproj -scheme soundfiles-explorer -configuration Release
 
 # Build (Debug)
@@ -22,32 +22,30 @@ xcodebuild -project soundfiles-explorer.xcodeproj -scheme soundfiles-explorer -c
 
 # Clean build
 xcodebuild -project soundfiles-explorer.xcodeproj -scheme soundfiles-explorer clean
+
+# Run all tests (no test target configured)
+xcodebuild test -project soundfiles-explorer.xcodeproj -scheme soundfiles-explorer
+
+# Run single test (when test target is added)
+xcodebuild test -project soundfiles-explorer.xcodeproj -scheme soundfiles-explorer -only-testing:soundfiles-explorerTests/TestClass/testMethod
 ```
 
-**Note**: This is an Xcode project, not Swift Package Manager. No `swift build` available.
+**Note**: Xcode project (not SPM). No `swift build` available.
 
 ## Testing
 
-**Current Status**: No unit test target configured in the project.
+**Current Status**: No unit test target configured.
 
-To add tests in the future:
-1. Add test target via Xcode: File → New → Target → Unit Testing Bundle
-2. Run tests: `xcodebuild test -project soundfiles-explorer.xcodeproj -scheme soundfiles-explorer`
-3. Run single test: `xcodebuild test -project soundfiles-explorer.xcodeproj -scheme soundfiles-explorer -only-testing:soundfiles-explorerTests/TestClass/testMethod`
+To add tests: File → New → Target → Unit Testing Bundle, then run `xcodebuild test`.
 
-**Manual Testing**:
-1. Build and run the application
-2. Drag audio files (WAV with BEXT/iXML chunks) into the window
-3. Use keyboard shortcuts: Space/K (play/pause), J (rewind), L (fast-forward)
-4. Click waveform to seek, use zoom slider to adjust view
+**Manual Testing**: Drag WAV files with BEXT/iXML chunks, use Space/K (play/pause), J/L (seek), click waveform to seek.
 
-## Code Style Guidelines
+## Code Style
 
 ### Formatting
-- **Indentation**: 4 spaces (no tabs)
-- **Line length**: No strict limit, keep reasonable (< 120 chars preferred)
-- **Braces**: Opening brace on same line, closing brace on new line
-- **Whitespace**: Single blank line between methods, blank line after MARK comments
+- 4 spaces, no tabs
+- Braces on same line
+- Single blank line between methods, after MARK comments
 
 ### File Organization
 ```swift
@@ -63,36 +61,28 @@ import AVFoundation
 import Foundation
 
 // MARK: - Types/Protocols
-
 // MARK: - Main Class/Struct
-
 // MARK: - Private Extensions
-
 // MARK: - Public Methods
-
 // MARK: - Private Methods
 ```
 
-### Naming Conventions
-- **Types**: PascalCase (`AudioMetadataReader`, `BEXTMetadata`)
-- **Properties/Variables**: camelCase (`currentTime`, `sampleRate`)
-- **Constants**: camelCase for local, uppercase snake for global (`maxCacheSize`)
-- **Methods**: camelCase with verb prefix (`loadAudioFile()`, `generateWaveforms()`)
-- **Protocols**: PascalCase with descriptor suffix (`AudioParserDelegate`)
-- **Enums**: PascalCase, cases lowercase unless representing types (`case invalidFile`)
-- **Private members**: No underscore prefix (use `private` access modifier)
+### Naming
+- Types: PascalCase (`AudioMetadataReader`)
+- Variables: camelCase (`currentTime`)
+- Constants: camelCase local, UPPER_SNAKE global (`maxCacheSize`)
+- Methods: camelCase verb prefix (`loadAudioFile()`)
+- Protocols: PascalCase descriptor suffix (`AudioParserDelegate`)
+- Enums: PascalCase, lowercase cases (`case invalidFile`)
+- Private: No underscore prefix, use `private` modifier
 
 ### Types
-- Prefer `let` over `var`
-- Use `Int`, `Double`, `Float` (not `CGFloat` unless UI-related)
+- Prefer `let`, use `Int`, `Double`, `Float` (not `CGFloat` unless UI)
 - Use `TimeInterval` for time values
-- Use explicit types for public APIs, inference allowed for local variables
-- Use `Result` type for async operations with multiple outcomes
+- Explicit types for public APIs
+- Use `Result` for async operations
 
 ### Error Handling
-- Define custom errors as enums conforming to `Error`, `LocalizedError`
-- Use `guard` for early returns, `if let` for optional binding
-- Example pattern from codebase:
 ```swift
 enum AudioParserError: Error, LocalizedError {
     case invalidFile
@@ -106,61 +96,59 @@ enum AudioParserError: Error, LocalizedError {
     }
 }
 
-// Usage:
 guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
     throw AudioParserError.noAudioTrack
 }
 ```
 
 ### Access Control
-- Default to `private` for implementation details
-- Use `internal` (default) for module-internal APIs
-- Use `public` only for framework-exported APIs
-- Use `final` on classes unless inheritance is needed
+- Default `private` for implementation
+- `internal` (default) for module APIs
+- `public` only for framework exports
+- `final` on classes unless inheritance needed
 
 ### Imports
-- Group by: Apple frameworks first, then third-party, then project modules
+- Apple frameworks first, then third-party, then project
 - Only import what you use
-- Common imports: `Foundation`, `Cocoa`, `AVFoundation`, `AVKit`
+- Common: `Foundation`, `Cocoa`, `AVFoundation`, `AVKit`
 
 ### Comments
-- Use `//` for single-line comments
-- Use `/* */` only for temporarily disabling code blocks
-- Use `// MARK: - Section Name` to organize files
-- Document public APIs with `///` doc comments
-- Avoid obvious comments (`// increment i`)
+- `//` for single-line, `/* */` for disabling blocks
+- `// MARK: - Section` for organization
+- `///` for public API docs
+- Avoid obvious comments
 
-### Architecture Patterns
-- MVC pattern used throughout
-- NSView subclasses for custom UI (no SwiftUI)
-- NotificationCenter for loose coupling between components
-- Async/await for asynchronous operations
+### Architecture
+- MVC pattern throughout
+- NSView subclasses for custom UI
+- NotificationCenter for loose coupling
+- Async/await for async operations
 - Private nested classes for file-local types
 
 ### Auto Layout
-- Use `NSLayoutConstraint.activate([...])` for batch constraint activation
-- Set `translatesAutoresizingMaskIntoConstraints = false` for programmatic UI
+- `NSLayoutConstraint.activate([...])` for batch activation
+- `translatesAutoresizingMaskIntoConstraints = false` for programmatic UI
 
-### Key Files
+## Key Files
 - `MVC.swift`: Main view controller
 - `AudioMetadataReader.swift`: BEXT/iXML parsing
 - `AudioWaveformView.swift`: Waveform visualization
 - `AudioPlaybackManager.swift`: Audio playback control
 - `AudioParserError.swift`: Error definitions
 
-### Frameworks
-- AppKit for UI (NSView, NSWindow, NSButton, etc.)
-- AVFoundation for audio playback and metadata
-- CoreMedia for time calculations (CMTime)
-- No external dependencies (pure Apple frameworks)
+## Frameworks
+- AppKit (NSView, NSWindow, etc.)
+- AVFoundation (audio, metadata)
+- CoreMedia (CMTime)
+- No external dependencies
 
-### Audio File Support
-- WAV (recommended, supports BEXT/iXML)
-- AIFF, CAF, MP3, M4A (basic support)
+## Audio Support
+- WAV (recommended, BEXT/iXML)
+- AIFF, CAF, MP3, M4A (basic)
 
-### Keyboard Shortcuts (Implemented)
+## Keyboard Shortcuts
 - Space/K: Play/Pause
-- J: Rewind (scrub backward)
-- L: Fast forward (scrub forward)
+- J: Rewind
+- L: Fast forward
 - Delete: Remove selected rows
-- Arrow keys: Navigate waveform (with Shift/Cmd modifiers)
+- Arrow keys: Navigate waveform (Shift/Cmd modifiers)

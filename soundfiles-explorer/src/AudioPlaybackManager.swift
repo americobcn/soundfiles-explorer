@@ -31,11 +31,7 @@ class AudioPlaybackManager: NSObject {
             )
         }
     }
-
-    // Basic Audio Info
-    // var channelCount: Int = 0
-    // var sampleRate: Double = 0
-    // var bitsPerChannel: Int = 0
+    
     var duration: Float64 = 0
         
     var rate: Float {
@@ -71,15 +67,6 @@ class AudioPlaybackManager: NSObject {
         
         // Store audio properties
         self.duration = duration
-        // self.channelCount = channelCount
-        // self.sampleRate = sampleRate
-        // self.bitsPerChannel = bitsPerChannel
-        
-        // print("AudioPlaybackManager: Set player item")
-        // print("Duration: \(duration)")
-        // print("Channel count: \(channelCount)")
-        // print("SampleRate: \(sampleRate)")
-        // print("Bits depth: \(bitsPerChannel)")
         
         // Add time observer on background queue to avoid blocking main thread
         let processingQueue = DispatchQueue(label: "com.audio.timeObserver", qos: .userInitiated)

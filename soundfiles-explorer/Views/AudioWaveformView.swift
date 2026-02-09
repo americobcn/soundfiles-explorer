@@ -1,6 +1,7 @@
 import Cocoa
 import AVFoundation
 
+
 /// A custom NSView that displays audio waveforms with multi-channel support,
 /// playback cursor, and time ruler
 class AudioWaveformView: NSView {
@@ -19,7 +20,8 @@ class AudioWaveformView: NSView {
     /// Playback state
     var currentTime: TimeInterval = 0 {
         didSet {
-            needsDisplay = true
+            // Only update cursor layer for better performance
+            updateCursorLayer(  )
         }
     }
     
@@ -42,24 +44,23 @@ class AudioWaveformView: NSView {
     }
     
     /// Visual customization
-    var backgroundColor: NSColor = NSColor(calibratedWhite: 0.35, alpha: 1.0)
+    var backgroundColor: NSColor = NSColor.clear //NSColor(calibratedWhite: 0.35, alpha: 0.0)
     var waveformColors: [NSColor] = [
-        NSColor(calibratedRed: 0.2, green: 0.6, blue: 1.0, alpha: 0.8),
-        NSColor(calibratedRed: 1.0, green: 0.4, blue: 0.4, alpha: 0.8),
-        NSColor(calibratedRed: 0.4, green: 1.0, blue: 0.4, alpha: 0.8),
-        NSColor(calibratedRed: 0.6, green: 0.3, blue: 0.2, alpha: 0.8),
-        NSColor(calibratedRed: 1.0, green: 0.0, blue: 0.7, alpha: 0.8),
-        NSColor(calibratedRed: 0.8, green: 0.8, blue: 0.1, alpha: 0.8),
-        NSColor(calibratedRed: 1.0, green: 0.6, blue: 0.5, alpha: 0.8)
+        NSColor(calibratedRed: 0.2, green: 0.6, blue: 1.0, alpha: 1.0),
+        NSColor(calibratedRed: 1.0, green: 0.4, blue: 0.4, alpha: 1.0),
+        NSColor(calibratedRed: 0.4, green: 1.0, blue: 0.6, alpha: 1.0),
+        NSColor(calibratedRed: 0.6, green: 0.7, blue: 0.2, alpha: 1.0),
+        NSColor(calibratedRed: 1.0, green: 0.5, blue: 0.7, alpha: 1.0),
+        NSColor(calibratedRed: 0.8, green: 0.8, blue: 0.1, alpha: 1.0),
+        NSColor(calibratedRed: 1.0, green: 0.9, blue: 0.5, alpha: 1.0)
     ]
-    var cursorColor: NSColor = NSColor(calibratedRed: 1.0, green: 0.3, blue: 0.3, alpha: 0.9)
+        
     var gridColor: NSColor = NSColor(calibratedWhite: 0.3, alpha: 0.5)
     var textColor: NSColor = .white
     
     /// Layout constants
     private let rulerHeight: CGFloat = 20
     private let channelSpacing: CGFloat = 1
-    // let channelLabelWidth: CGFloat = 0
     private let minChannelHeight: CGFloat = 60
     private let maxChannelHeight: CGFloat = 100
     private(set) var channelHeight: CGFloat = 60
@@ -70,12 +71,17 @@ class AudioWaveformView: NSView {
             needsDisplay = true
         }
     }
-
-    var scrollOffset: CGFloat = 0 {
-        didSet {
-            needsDisplay = true
-        }
-    }
+    
+    // MARK: - Layers
+    
+    /// Layer for static waveform content (background + waveforms)
+    private var waveformLayer: CALayer?
+    
+    /// Layer for playback cursor (updated frequently)
+    private var cursorLayer: CALayer?
+    
+    /// Flag to track if waveform layer needs update
+    private var needsWaveformUpdate = true
 
             
     // MARK: - Initialization
@@ -95,8 +101,18 @@ class AudioWaveformView: NSView {
     private func setupView() {
         wantsLayer = true
         translatesAutoresizingMaskIntoConstraints = false
-        layer?.borderColor = NSColor.red.cgColor
-        layer?.borderWidth = 1
+        layer?.zPosition = 0
+        // Create waveform layer for static content
+        waveformLayer = CALayer()
+        waveformLayer?.zPosition = 10
+        // waveformLayer?.borderWidth = 1.0
+        layer?.addSublayer(waveformLayer!)
+        
+        // Create cursor layer for playback cursor
+        cursorLayer = CALayer()
+        cursorLayer?.zPosition = 100 // Ensure cursor is on top
+        cursorLayer?.backgroundColor = NSColor.init(calibratedRed: 1.0, green: 0, blue: 0, alpha: 1).cgColor
+        layer?.addSublayer(cursorLayer!)        
     }
     
     
@@ -127,7 +143,8 @@ class AudioWaveformView: NSView {
         let cacheKey = "\(duration)-\(sampleRate)-\(channelCount)-\(pixelsPerSecond)" as NSString
         Self.waveformCache.setObject(WaveformCacheEntry(waveforms: waveformData), forKey: cacheKey)
         
-        needsDisplay = true
+        // Invalidate waveform layer to force re-render
+        invalidateWaveformLayer()
         updateContentSize()
     }
 
@@ -136,48 +153,21 @@ class AudioWaveformView: NSView {
     
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        guard let context = NSGraphicsContext.current?.cgContext else { return }
         
-        // Draw background
-        backgroundColor.setFill()
-        context.fill(bounds)
-        
-        // Draw Time ruler
-        // drawTimeRuler(in: context)
-        
-        // Calculate layout
-        let channelCount = channelWaveforms.count
-        guard channelCount > 0 else {
-            drawEmptyState(in: context)
-            return
+        // Always ensure waveformLayer frame is correct for scrolling
+        if let waveformLayer = waveformLayer {
+            let fullContentWidth = getTotalWidth()
+            let fullContentHeight = intrinsicContentSize.height
+            waveformLayer.frame = NSRect(x: 0, y: 0, width: fullContentWidth, height: max(fullContentHeight, bounds.height))
         }
         
-        // Calculate starting Y to attach channels to top when content fits
-        let totalContentHeight = intrinsicContentSize.height
-        let startY = max(0, bounds.height - totalContentHeight)
-        
-        // Draw each channel
-        for (index, waveform) in channelWaveforms.enumerated() {
-            let yPosition = startY + channelSpacing + CGFloat(index) * (channelHeight + channelSpacing)
-            let channelRect = NSRect(
-                x: 0, // channelLabelWidth
-                y: yPosition,
-                width: bounds.width, // - channelLabelWidth
-                height: channelHeight
-            )
-            
-            // Draw channel background
-            NSColor(calibratedWhite: 0.1, alpha: 1.0).setFill()
-            context.fill(channelRect)
-            
-            // Draw waveform
-            let color = waveformColors[index % waveformColors.count]
-            drawWaveform(waveform, in: channelRect, color: color, context: context)
+        // Render waveform layer if needed
+        if needsWaveformUpdate {
+            renderWaveformLayer()
         }
         
-        // Draw playback cursor
-        drawPlaybackCursor(in: context)
-        updateContentSize()
+        // Update cursor layer (always update on draw)
+        updateCursorLayer()
     }
     
     private func drawEmptyState(in context: CGContext) {
@@ -218,7 +208,7 @@ class AudioWaveformView: NSView {
             }
         }
         
-        let startTime = TimeInterval(scrollOffset / pixelsPerSecond)
+        let startTime = 0.0 //TimeInterval(scrollOffset / pixelsPerSecond)
         let endTime = startTime + secondsVisible
         
         let firstMarker = floor(startTime / markerInterval) * markerInterval
@@ -268,7 +258,7 @@ class AudioWaveformView: NSView {
         guard !waveform.isEmpty else { return }
         
         let midY = rect.midY
-        let maxAmplitude = rect.height / 2 - 2
+        let maxAmplitude = rect.height / 2 - 1
         
         context.saveGState()
         context.clip(to: rect)
@@ -301,51 +291,133 @@ class AudioWaveformView: NSView {
         path.fill()
         
         // Draw center line
-        gridColor.setStroke()
-        context.setLineWidth(0.5)
-        context.move(to: CGPoint(x: rect.minX, y: midY))
-        context.addLine(to: CGPoint(x: rect.maxX, y: midY))
-        context.strokePath()
+        // gridColor.setStroke()
+        // context.setLineWidth(0.0)
+        // context.move(to: CGPoint(x: rect.minX, y: midY))
+        // context.addLine(to: CGPoint(x: rect.maxX, y: midY))
+        // context.strokePath()
         
         context.restoreGState()
         
     }
+
     
-    private func drawPlaybackCursor(in context: CGContext) {
-        guard duration > 0 else { return }
+    // MARK: - Layer Rendering
+    
+    /// Renders static waveform content to waveformLayer
+    private func renderWaveformLayer() {
+        guard let waveformLayer = waveformLayer else { return }
         
-        let startTime = TimeInterval(scrollOffset / pixelsPerSecond)
-        let x = CGFloat(currentTime - startTime) * pixelsPerSecond // channelLabelWidth +
+        // Get full content dimensions for scrolling
+        let fullContentWidth = getTotalWidth()
+        let fullContentHeight = intrinsicContentSize.height
+        
+        // Update layer frame to cover full scrollable content
+        waveformLayer.frame = NSRect(x: 0, y: 0, width: fullContentWidth, height: max(fullContentHeight, bounds.height))
+        waveformLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 1.0
+        
+        // Create bitmap context for rendering full content width
+        let width = Int(fullContentWidth)
+        let height = Int(max(fullContentHeight, bounds.height))
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
+        
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ) else { return }
+        
+        // Flip context to match flipped view coordinate system (0,0 at top-left)
+        context.translateBy(x: 0, y: CGFloat(height))
+        context.scaleBy(x: 1, y: -1)
+        
+        // Draw background for full content area
+        let fullBounds = NSRect(x: 0, y: 0, width: fullContentWidth, height: CGFloat(height))
+        context.setFillColor(NSColor.clear.cgColor)
+        context.fill(fullBounds)
+        
+        // Draw channels
+        let channelCount = channelWaveforms.count
+        guard channelCount > 0 else {
+            // Set rendered image to layer
+            if let cgImage = context.makeImage() {
+                waveformLayer.contents = cgImage
+            }
+            return
+        }
+        
+        // Calculate starting Y to attach channels to top when content fits
+        let startY = max(0, CGFloat(height) - fullContentHeight)
+        
+        // Draw each channel across full width
+        for (index, waveform) in channelWaveforms.enumerated() {
+            let yPosition = startY  + CGFloat(index) * (channelHeight + channelSpacing)
+            let channelRect = NSRect(
+                x: 0,
+                y: yPosition,
+                width: fullContentWidth,
+                height: channelHeight
+            )
+            
+            // Draw channel background
+            let c = NSColor(calibratedWhite: 1.0, alpha: 0.075)
+            context.setFillColor(c.cgColor)
+            context.fill(channelRect)
+            
+            // Draw waveform
+            let color = waveformColors[index % waveformColors.count]
+            drawWaveform(waveform, in: channelRect, color: color, context: context)
+        }
+        
+        // Set rendered image to layer
+        if let cgImage = context.makeImage() {
+            waveformLayer.contents = cgImage
+        }
+        
+        needsWaveformUpdate = true
+    }
+    
+    /// Updates cursor layer with current playback position
+    private func updateCursorLayer() {
+        guard let cursorLayer = cursorLayer else { return }
+        guard duration > 0 else {
+            cursorLayer.contents = nil
+            return
+        }
+        
+        cursorLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 1.0
+        let x = CGFloat(currentTime) * pixelsPerSecond
         
         // Only draw if cursor is visible
-        if  x <= bounds.width {  // x >= channelLabelWidth &&
-            context.saveGState()
-            
-            // Draw cursor line
-            cursorColor.setStroke()
-            context.setLineWidth(2)
-            context.move(to: CGPoint(x: x, y: 0))
-            context.addLine(to: CGPoint(x: x, y: bounds.height)) //  - rulerHeight
-            context.strokePath()
-            
-            cursorColor.setFill()
-            
-            context.restoreGState()
+        if x >= 0 && x <= bounds.width {
+            // Position cursor layer at cursor location
+            cursorLayer.frame = NSRect(x: x , y: 0, width: 2.0, height: bounds.height)
         }
+    }
+    
+    
+    
+    /// Invalidates waveform layer to force re-render
+    func invalidateWaveformLayer() {
+        needsWaveformUpdate = true
+        needsDisplay = true
     }
     
     // MARK: - Helper Methods
     
     func setChannelHeight() {
         guard channelNames.count > 0 else { return  }
-        
         let availableHeight = bounds.height // - rulerHeight
         let totalSpacing = CGFloat(channelWaveforms.count + 1) * channelSpacing
         let height = (availableHeight - totalSpacing) / CGFloat(channelWaveforms.count)
         channelHeight = max(minChannelHeight, min(height, maxChannelHeight))
-        // let viewHeight = CGFloat(channelWaveforms.count) * channelHeight + totalSpacing
         updateContentSize()
-        // return viewHeight
+        
     }
     
     
@@ -380,11 +452,13 @@ class AudioWaveformView: NSView {
     /// Zoom in/out
     func setZoomLevel(_ pixelsPerSecond: CGFloat) {
         self.pixelsPerSecond = max(10, min(1000, pixelsPerSecond))
+        // Invalidate waveform layer to force re-render with new zoom level
+        invalidateWaveformLayer()
     }
     
     /// Get the total width needed for the waveform
     func getTotalWidth() -> CGFloat {
-        return CGFloat(duration) * pixelsPerSecond // + channelLabelWidth
+        return CGFloat(duration) * pixelsPerSecond
     }
         
     // MARK: - Mouse Interaction
@@ -392,7 +466,7 @@ class AudioWaveformView: NSView {
     override func mouseDown(with event: NSEvent) {
         let location = convert(event.locationInWindow, from: nil)
         if location.x >= 0 {
-            let clickedTime =  TimeInterval((location.x) / pixelsPerSecond) // - channelLabelWidth
+            let clickedTime =  TimeInterval((location.x) / pixelsPerSecond)
             currentTime = max(0, min(duration, clickedTime))
             
             // Notify delegate or post notification for seeking
@@ -431,6 +505,8 @@ extension AudioWaveformView {
     override var isFlipped: Bool {
         return true
     }
+    
+    
 }
 
 
