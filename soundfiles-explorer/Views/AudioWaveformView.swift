@@ -12,7 +12,6 @@ class AudioWaveformView: NSView {
     var duration: TimeInterval = 0
     var sampleRate: Double = 0
     
-    
     /// Waveform data for each channel
     var channelWaveforms: [[Float]] = []
     private(set) var channelNames: [String] = []
@@ -21,7 +20,7 @@ class AudioWaveformView: NSView {
     var currentTime: TimeInterval = 0 {
         didSet {
             // Only update cursor layer for better performance
-            updateCursorLayer(  )
+            updateCursorLayer()
         }
     }
     

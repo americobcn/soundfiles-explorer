@@ -68,7 +68,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     deinit {
         displayLink?.invalidate()
         removeObserver(self, forKeyPath: "AudioWaveformViewDidSeek")
-        removeObserver(self, forKeyPath: "AudioPlaybackStateChanged")        
+        removeObserver(self, forKeyPath: "AudioPlaybackStateChanged")
+        removeObserver(self, forKeyPath: "AudioPlaybackTimeChanged")
     }
     
     
@@ -551,7 +552,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
 
     // MARK: - Keyboard event handlers
     override func keyDown(with event: NSEvent) {
-        print("Key Event:\(event)")
             switch event.keyCode {
             case 51, 117:
                 deleteSelectedRows()
@@ -621,7 +621,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         
         let visibleRect = scrollView.documentVisibleRect
         let newX = destTime <= 0 ? 0.0 : destTime * waveformView.pixelsPerSecond
-        scrollView.contentView.scroll(to: NSPoint(x: newX, y: visibleRect.minY))
+        scrollView.contentView.scroll(to: NSPoint(x: newX * 0.8, y: visibleRect.minY))
         scrollView.reflectScrolledClipView(scrollView.contentView)
         // Note: Don't call updatePlaybackPosition() here - it would overwrite
         // waveformView.currentTime with the player's current time before the seek completes.
@@ -692,23 +692,23 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     // MARK: - Methods
     private func setupDisplayLink() {
         displayLink = self.waveformView.displayLink(target: self, selector: #selector(updatePlaybackPosition))
-        displayLink?.preferredFrameRateRange = CAFrameRateRange(minimum: 1/60.0, maximum: 1/30.0, preferred: 1/30.0)
         displayLink?.isPaused = true
         displayLink?.add(to: .main, forMode: .common)
     }
  
-    // private var lastUpdateTime: CFTimeInterval = 0
-    // private let updateInterval: CFTimeInterval = 1.0 / 30.0 // Update at 30fps max
+    private var lastUpdateTime: CFTimeInterval = 0
+    private let updateInterval: CFTimeInterval = 1.0 / 60.0 // Update at 60fps max
     
     @objc private func updatePlaybackPosition() {
-        // let currentTime = CACurrentMediaTime()
+        let currentTime = CACurrentMediaTime()
         // Rate limit updates to prevent excessive CPU usage
-        // if currentTime - lastUpdateTime < updateInterval { return }
-        // lastUpdateTime = currentTime
-        
+        if currentTime - lastUpdateTime < updateInterval { return }
+        lastUpdateTime = currentTime
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.waveformView.currentTime = audioPlaybackManager.getCurrentTime()
+            // Use getCurrentTimeDirect() for displayLink to ensure tight audio-visual sync
+            // This queries AVPlayer directly at 60fps instead of using the 30fps cached value
+            self.waveformView.currentTime = audioPlaybackManager.getCurrentTimeDirect()
             self.updateTimeLabel()
             self.scrollToFollowPlayback()
         }
@@ -749,13 +749,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         waveformView.setZoomLevel(CGFloat(zoomSlider.doubleValue))
         waveformView.updateContentSize()
     }
-    
-    @objc private func waveformViewDidSeek(_ notification: Notification) {
-        guard let time = (notification.userInfo?["time"] as? TimeInterval) else { return }
-        audioPlaybackManager.seek(to: time)
         
-    }
-    
     private func setupNotifications() {
         NotificationCenter.default.addObserver(
             self,
@@ -770,11 +764,29 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             name: NSNotification.Name("AudioPlaybackStateChanged"),
             object: audioPlaybackManager
         )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(playbackTimeChanged(_:)),
+            name: NSNotification.Name("AudioPlaybackTimeChanged"),
+            object: nil
+        )
+    }
+    
+    @objc private func waveformViewDidSeek(_ notification: Notification) {
+        guard let time = (notification.userInfo?["time"] as? TimeInterval) else { return }
+        print("WFV Time Changed to: \(time)")
+        audioPlaybackManager.seek(to: time)
     }
     
     @objc private func playbackStateChanged(_ notification: Notification) {
         guard let isPlaying = notification.userInfo?["isPlaying"] as? Bool else { return }
         displayLink?.isPaused = !isPlaying
+    }
+        
+    @objc private func playbackTimeChanged(_ notification: Notification) {
+        guard let time = notification.userInfo?["time"] as? TimeInterval else { return }        
+        print("APM Playback Time Changed to: \(time)")
     }
     
     private func formatTime(_ time: TimeInterval) -> String {
@@ -784,6 +796,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         let milliseconds = Int((time.truncatingRemainder(dividingBy: 1)) * 100)
         return String(format: "%d:%02d.%02d", minutes, seconds, milliseconds)
     }
+    
     
     // MARK: - Channel Labels
     

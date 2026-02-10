@@ -5,17 +5,16 @@ import AVFoundation
 class AudioPlaybackManager: NSObject {
     // MARK: - Properties
     private var player: AVPlayer?
-    private var currentTimeObserver: Any?
-    private var isObserving = false
-
+    
     
     // MARK: - Public Properties
     var currentTime: TimeInterval = 0 {
         didSet {
+            print("APM old value: \(oldValue), didSet: \(currentTime)")
             // Notify observers of time change
             NotificationCenter.default.post(
                 name: NSNotification.Name("AudioPlaybackTimeChanged"),
-                object: self,
+                object: nil,
                 userInfo: ["time": currentTime]
             )
         }
@@ -56,28 +55,11 @@ class AudioPlaybackManager: NSObject {
     // MARK: - Public Methods
 
     /// Set the player item for playback
-    func setPlayerItem(_ item: AVPlayerItem, duration: Float64) { // , channelCount: Int, sampleRate: Double, bitsPerChannel: Int
-        // Remove previous observer if exists
-        if isObserving, let observer = currentTimeObserver {
-            player?.removeTimeObserver(observer)
-            isObserving = false
-        }
-
+    func setPlayerItem(_ item: AVPlayerItem, duration: Float64) {
         player?.replaceCurrentItem(with: item)
         
         // Store audio properties
         self.duration = duration
-        
-        // Add time observer on background queue to avoid blocking main thread
-        let processingQueue = DispatchQueue(label: "com.audio.timeObserver", qos: .userInitiated)
-        currentTimeObserver = player?.addPeriodicTimeObserver(forInterval: CMTimeMake(value: 1, timescale: 30), queue: processingQueue) { [weak self] time in
-            guard let self = self else { return }
-            let timeValue = CMTimeGetSeconds(time)
-            DispatchQueue.main.async {
-                self.currentTime = timeValue
-            }
-        }
-        isObserving = true
     }
 
     /// Play the audio
@@ -116,10 +98,13 @@ class AudioPlaybackManager: NSObject {
     func setRate(_ rate: Float) {
         player?.rate = rate
     }
-
-    /// Get current playback time
-    func getCurrentTime() -> TimeInterval {
-        return currentTime
+    
+    
+    /// Get current playback time directly from AVPlayer for lowest latency
+    /// Use this for displayLink updates to ensure tight audio-visual sync
+    func getCurrentTimeDirect() -> TimeInterval {
+        guard let player = player else { return 0 }
+        return CMTimeGetSeconds(player.currentTime())
     }
 
     /// Get current player state
@@ -130,10 +115,6 @@ class AudioPlaybackManager: NSObject {
 
     /// Cleanup resources
     func cleanup() {
-        if isObserving, let observer = currentTimeObserver {
-            player?.removeTimeObserver(observer)
-            isObserving = false
-        }
         player = nil
     }
 }
