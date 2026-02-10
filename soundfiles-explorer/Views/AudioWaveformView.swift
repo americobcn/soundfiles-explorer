@@ -24,7 +24,7 @@ class AudioWaveformView: NSView {
         }
     }
     
-    var isPlaying: Bool = false
+    // var isPlaying: Bool = false
     
     /// Waveform caching using NSCache for thread-safe, automatic eviction
     private static let waveformCache: NSCache<NSString, WaveformCacheEntry> = {
@@ -91,13 +91,11 @@ class AudioWaveformView: NSView {
     
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        print("AudioWavformView: override init")
         setupView()
     }
     
     required init?(coder: NSCoder) {
         super.init(coder: coder)
-        print("AudioWavformView: required init")
         setupView()
     }
                 
@@ -173,11 +171,7 @@ class AudioWaveformView: NSView {
         if needsWaveformUpdate {
             renderWaveformLayer()
         }
-        
-        // Render waveform layer if needed
-        if needsRulerUpdate {
-            // drawTimeRuler()
-        }
+            
         
         // Update cursor layer (always update on draw)
         updateCursorLayer()
@@ -238,7 +232,7 @@ class AudioWaveformView: NSView {
             }
         }
         
-        let startTime = 0.0 //TimeInterval(scrollOffset / pixelsPerSecond)
+        let startTime = 0.0
         let endTime = startTime + secondsVisible
         
         let firstMarker = floor(startTime / markerInterval) * markerInterval
@@ -282,7 +276,7 @@ class AudioWaveformView: NSView {
         
         let attributedString = NSAttributedString(string: label, attributes: attributes)
         let size = attributedString.size()
-        attributedString.draw(at: NSPoint(x: point.x, y: point.y - size.height / 2))
+        attributedString.draw(at: NSPoint(x: point.x  , y: point.y - size.height / 2))
         
     }
     
@@ -322,14 +316,7 @@ class AudioWaveformView: NSView {
         // Fill waveform
         color.setFill()
         path.fill()
-        
-        
-        // Draw center line
-        // gridColor.setStroke()
-        // context.setLineWidth(0.0)
-        // context.move(to: CGPoint(x: rect.minX, y: midY))
-        // context.addLine(to: CGPoint(x: rect.maxX, y: midY))
-        // context.strokePath()
+                        
         context.restoreGState()
         
     }
@@ -429,7 +416,7 @@ class AudioWaveformView: NSView {
         // Only draw if cursor is visible
         if x >= 0 && x <= bounds.width {
             // Position cursor layer at cursor location
-            cursorLayer.frame = NSRect(x: x , y: 0, width: 2.0, height: bounds.height)
+            cursorLayer.frame = NSRect(x: x, y: 0, width: 2.0, height: bounds.height)
         }
     }
     
@@ -484,7 +471,7 @@ class AudioWaveformView: NSView {
     
     /// Zoom in/out
     func setZoomLevel(_ pixelsPerSecond: CGFloat) {
-        self.pixelsPerSecond = max(10, min(1000, pixelsPerSecond))
+        self.pixelsPerSecond = pixelsPerSecond // max(10, min(1000, pixelsPerSecond))
         // Invalidate waveform layer to force re-render with new zoom level
         invalidateWaveformLayer()
     }

@@ -8,17 +8,7 @@ class AudioPlaybackManager: NSObject {
     
     
     // MARK: - Public Properties
-    var currentTime: TimeInterval = 0 {
-        didSet {
-            print("APM old value: \(oldValue), didSet: \(currentTime)")
-            // Notify observers of time change
-            NotificationCenter.default.post(
-                name: NSNotification.Name("AudioPlaybackTimeChanged"),
-                object: nil,
-                userInfo: ["time": currentTime]
-            )
-        }
-    }
+    var currentTime: TimeInterval = 0
 
     var isPlaying: Bool = false {
         didSet {
@@ -57,15 +47,15 @@ class AudioPlaybackManager: NSObject {
 
     /// Set the player item for playback
     func setPlayerItem(_ item: AVPlayerItem, duration: Float64) {
+        stop()
         player?.replaceCurrentItem(with: item)
-        
         // Store audio properties
         self.duration = duration
     }
 
     /// Play the audio
     func play() {
-        player?.playImmediately(atRate: 1.0)  //player?.play()
+        player?.play()
         isPlaying = true
     }
 

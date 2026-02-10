@@ -69,7 +69,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         displayLink?.invalidate()
         removeObserver(self, forKeyPath: "AudioWaveformViewDidSeek")
         removeObserver(self, forKeyPath: "AudioPlaybackStateChanged")
-        removeObserver(self, forKeyPath: "AudioPlaybackTimeChanged")
     }
     
     
@@ -248,7 +247,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         let zoomLabel = NSTextField(labelWithString: "Zoom:")
         
         // Zoom slider
-        zoomSlider = NSSlider(value: 100, minValue: 10, maxValue: 500, target: self, action: #selector(zoomChanged))
+        zoomSlider = NSSlider(value: 100, minValue: 10, maxValue: 1000, target: self, action: #selector(zoomChanged))
         zoomSlider.widthAnchor.constraint(equalToConstant: 200).isActive = true
         
         // Time label
@@ -420,7 +419,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         let selectedRow = tableView.selectedRow
         if selectedRow != -1 && selectedRow < displayedIndices.count {
             if audioPlaybackManager.isPlaying {
-                audioPlaybackManager.pause()
+                audioPlaybackManager.stop()
             }
             
             let actualIndex = displayedIndices[selectedRow]
@@ -439,7 +438,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                 setupChannelLabels()
                 
                 // Update playback manager with player item
-                audioPlaybackManager.setPlayerItem(fileInfo.playerItem, duration: Float64(fileInfo.duration))
+                audioPlaybackManager.setPlayerItem(fileInfo.playerItem, duration: Float64(fileInfo.duration))                
             }
         }
                                                                     
@@ -584,45 +583,38 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     
     @objc private func playPause() {
         // AVAudioPlayer
-        if waveformView.isPlaying {
+        if audioPlaybackManager.isPlaying {
             audioPlaybackManager.pause()
             playPauseButton.title = "▶ Play"
-            waveformView.isPlaying = false
         } else {
             audioPlaybackManager.play()
             playPauseButton.title = "⏸ Pause"
-            waveformView.isPlaying = true
         }
     }
     
     @objc private func playRewind() {
-        // guard let player = audioPlayer else { return }
         audioPlaybackManager.setRate(audioPlaybackManager.rate - 1.5)
         audioPlaybackManager.isPlaying = true
-        waveformView.isPlaying = true
     }
     
     @objc private func playForward() {
-        // guard let player = audioPlayer else { return }
         audioPlaybackManager.setRate(audioPlaybackManager.rate + 1.5)
         audioPlaybackManager.isPlaying = true
-        waveformView.isPlaying = true
     }
     
 
     @objc private func stopAndGoStartEnd(_ modifier: NSEvent.ModifierFlags) {
         audioPlaybackManager.pause()
-        waveformView.isPlaying = false
-        audioPlaybackManager.isPlaying = false
         // Use proper modifier flag detection instead of magic number
         let destTime = modifier.contains(.control) ? audioPlaybackManager.duration : 0.0
         audioPlaybackManager.seek(to: destTime)
         waveformView.currentTime = destTime
-        
+                
         let visibleRect = scrollView.documentVisibleRect
         let newX = destTime <= 0 ? 0.0 : destTime * waveformView.pixelsPerSecond
         scrollView.contentView.scroll(to: NSPoint(x: newX * 0.8, y: visibleRect.minY))
         scrollView.reflectScrolledClipView(scrollView.contentView)
+        updateTimeLabel(destTime)
         // Note: Don't call updatePlaybackPosition() here - it would overwrite
         // waveformView.currentTime with the player's current time before the seek completes.
         // The displayLink will update the position once the seek finishes.
@@ -695,43 +687,39 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         displayLink?.isPaused = true
         displayLink?.add(to: .main, forMode: .common)
     }
- 
-    // private var lastUpdateTime: CFTimeInterval = 0
-    // private let updateInterval: CFTimeInterval = 1.0 / 60.0 // Update at 60fps max
     
     @objc private func updatePlaybackPosition() {
-        self.waveformView.currentTime = audioPlaybackManager.getCurrentTimeDirect()
-        self.updateTimeLabel()
-        self.scrollToFollowPlayback()
-        
+        let ct = audioPlaybackManager.getCurrentTimeDirect()
+        self.waveformView.currentTime = ct
+        self.updateTimeLabel(ct)
+        self.scrollToFollowPlayback(ct)
     }
     
-    private func scrollToFollowPlayback() {
+    
+    private func scrollToFollowPlayback(_ ct: TimeInterval) {
         let visibleRect = scrollView.documentVisibleRect
-        let cursorX = CGFloat(audioPlaybackManager.currentTime) * waveformView.pixelsPerSecond
+        let cursorX = ct *  zoomSlider.doubleValue // waveformView.pixelsPerSecond
         
         // Scroll if cursor is near the edges or outside visible area
-        let scrollMargin: CGFloat = 100
-        let needsScroll = cursorX < visibleRect.minX + scrollMargin ||
-                         cursorX > visibleRect.maxX - scrollMargin
+        let scrollMargin: CGFloat = 100.0
+        let needsScroll = cursorX < visibleRect.minX + scrollMargin || cursorX > visibleRect.maxX - scrollMargin
         
         if needsScroll {
-            let newX = max(0, cursorX - visibleRect.width / 2)
+            let newX = max(0, cursorX - visibleRect.width / 12)
             scrollView.contentView.scroll(to: NSPoint(x: newX, y: visibleRect.minY))
             scrollView.reflectScrolledClipView(scrollView.contentView)
         }
     }
     
     
-    
-    private func updateTimeLabel() {
+    private func updateTimeLabel(_ ct: TimeInterval) {
         guard let audioPlaybackManager else {
             timeLabel.stringValue = "0:00.00 / 0:00.00"
             return
         }
                 
-        let current = formatTime(audioPlaybackManager.currentTime)
-        let total = formatTime(audioPlaybackManager.duration)        
+        let current = formatTime(ct)
+        let total = formatTime(audioPlaybackManager.duration)
         
         timeLabel.stringValue = "\(current) / \(total)"
     }
@@ -741,7 +729,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         waveformView.setZoomLevel(CGFloat(zoomSlider.doubleValue))
         waveformView.updateContentSize()
     }
-        
+    
+    
     private func setupNotifications() {
         NotificationCenter.default.addObserver(
             self,
@@ -756,13 +745,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             name: NSNotification.Name("AudioPlaybackStateChanged"),
             object: audioPlaybackManager
         )
-        
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(playbackTimeChanged(_:)),
-            name: NSNotification.Name("AudioPlaybackTimeChanged"),
-            object: nil
-        )
+                
     }
     
     @objc private func waveformViewDidSeek(_ notification: Notification) {
@@ -775,11 +758,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         guard let isPlaying = notification.userInfo?["isPlaying"] as? Bool else { return }
         displayLink?.isPaused = !isPlaying
     }
-        
-    @objc private func playbackTimeChanged(_ notification: Notification) {
-        guard let time = notification.userInfo?["time"] as? TimeInterval else { return }        
-        print("APM Playback Time Changed to: \(time)")
-    }
+    
     
     private func formatTime(_ time: TimeInterval) -> String {
         guard time >= 0 else { return "--" }
