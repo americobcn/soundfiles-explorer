@@ -49,6 +49,7 @@ class AudioPlaybackManager: NSObject {
     override init() {
         super.init()
         player = AVPlayer()
+        player?.automaticallyWaitsToMinimizeStalling = false
     }
 
 
@@ -64,7 +65,7 @@ class AudioPlaybackManager: NSObject {
 
     /// Play the audio
     func play() {
-        player?.play()
+        player?.playImmediately(atRate: 1.0)  //player?.play()
         isPlaying = true
     }
 
@@ -86,7 +87,7 @@ class AudioPlaybackManager: NSObject {
     /// Seek to a specific time
     func seek(to time: TimeInterval) {
         guard let player = player else { return }
-        let cmTime = CMTime(seconds: time, preferredTimescale: 1)
+        let cmTime = CMTime(seconds: time, preferredTimescale: 100)
         player.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
             if finished {
                 self?.currentTime = time

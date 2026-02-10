@@ -57,7 +57,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     private let metadataReader = AudioMetadataReader()
     private let audioFileLoader = AudioFileLoader()
     private var timeLabel: NSTextField!
-    private var channelLabelWidth: CGFloat = 100
+    private var channelLabelWidth: CGFloat = 80
     
     // MARK: - Init
     required init?(coder: NSCoder) {
@@ -696,22 +696,14 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         displayLink?.add(to: .main, forMode: .common)
     }
  
-    private var lastUpdateTime: CFTimeInterval = 0
-    private let updateInterval: CFTimeInterval = 1.0 / 60.0 // Update at 60fps max
+    // private var lastUpdateTime: CFTimeInterval = 0
+    // private let updateInterval: CFTimeInterval = 1.0 / 60.0 // Update at 60fps max
     
     @objc private func updatePlaybackPosition() {
-        let currentTime = CACurrentMediaTime()
-        // Rate limit updates to prevent excessive CPU usage
-        if currentTime - lastUpdateTime < updateInterval { return }
-        lastUpdateTime = currentTime
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            // Use getCurrentTimeDirect() for displayLink to ensure tight audio-visual sync
-            // This queries AVPlayer directly at 60fps instead of using the 30fps cached value
-            self.waveformView.currentTime = audioPlaybackManager.getCurrentTimeDirect()
-            self.updateTimeLabel()
-            self.scrollToFollowPlayback()
-        }
+        self.waveformView.currentTime = audioPlaybackManager.getCurrentTimeDirect()
+        self.updateTimeLabel()
+        self.scrollToFollowPlayback()
+        
     }
     
     private func scrollToFollowPlayback() {
