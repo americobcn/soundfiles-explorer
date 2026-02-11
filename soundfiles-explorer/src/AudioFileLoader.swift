@@ -206,7 +206,7 @@ final class AudioFileLoader {
         var channelMaxValues: [[Float]] = Array(repeating: [], count: channelCount)
         
         // Read audio in chunks
-        let bufferSize: AVAudioFrameCount = 32768
+        let bufferSize: AVAudioFrameCount = 2048
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: bufferSize) else {
             throw AudioParserError.malformedMetadata
         }

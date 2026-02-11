@@ -683,7 +683,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     
     // MARK: - Methods
     private func setupDisplayLink() {
-        displayLink = self.waveformView.displayLink(target: self, selector: #selector(updatePlaybackPosition))
+        displayLink = self.waveformViewPlayer.displayLink(target: self, selector: #selector(updatePlaybackPosition))
         displayLink?.isPaused = true
         displayLink?.add(to: .main, forMode: .common)
     }

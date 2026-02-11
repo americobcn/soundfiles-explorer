@@ -24,8 +24,6 @@ class AudioWaveformView: NSView {
         }
     }
     
-    // var isPlaying: Bool = false
-    
     /// Waveform caching using NSCache for thread-safe, automatic eviction
     private static let waveformCache: NSCache<NSString, WaveformCacheEntry> = {
         let cache = NSCache<NSString, WaveformCacheEntry>()
