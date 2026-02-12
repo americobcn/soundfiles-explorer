@@ -21,6 +21,7 @@ class AudioWaveformView: NSView {
         didSet {
             // Only update cursor layer for better performance
             updateCursorLayer()
+            
         }
     }
     
@@ -111,12 +112,13 @@ class AudioWaveformView: NSView {
         cursorLayer = CALayer()
         cursorLayer?.zPosition = 50 // Ensure cursor is on top
         cursorLayer?.backgroundColor = NSColor.init(calibratedRed: 1.0, green: 0, blue: 0, alpha: 1).cgColor
+        cursorLayer?.isOpaque = false
         layer?.addSublayer(cursorLayer!)
         
-        rulerLayer = CALayer()
-        rulerLayer?.zPosition = 100
-        rulerLayer?.backgroundColor = NSColor.darkGray.cgColor
-        layer?.addSublayer(rulerLayer!)
+        // rulerLayer = CALayer()
+        // rulerLayer?.zPosition = 100
+        // rulerLayer?.backgroundColor = NSColor.darkGray.cgColor
+        // layer?.addSublayer(rulerLayer!)
     }
     
     
@@ -383,9 +385,9 @@ class AudioWaveformView: NSView {
             )
             
             // Draw channel background
-            let c = NSColor(calibratedWhite: 1.0, alpha: 0.075)
-            context.setFillColor(c.cgColor)
-            context.fill(channelRect)
+            // let c = NSColor(calibratedWhite: 1.0, alpha: 0.075)
+            // context.setFillColor(c.cgColor)
+            // context.fill(channelRect)
             
             // Draw waveform
             let color = waveformColors[index % waveformColors.count]
@@ -414,10 +416,9 @@ class AudioWaveformView: NSView {
         // Only draw if cursor is visible
         if x >= 0 && x <= bounds.width {
             // Position cursor layer at cursor location
-            cursorLayer.frame = NSRect(x: x, y: 0, width: 2.0, height: bounds.height)
+            cursorLayer.frame = NSRect(x: x, y: 0, width: 2.0, height: bounds.height)            
         }
     }
-    
     
     
     /// Invalidates waveform layer to force re-render

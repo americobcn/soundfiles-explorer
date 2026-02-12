@@ -20,6 +20,11 @@ xcodebuild -project soundfiles-explorer.xcodeproj -scheme soundfiles-explorer -c
 
 # Clean
 xcodebuild -project soundfiles-explorer.xcodeproj -scheme soundfiles-explorer clean
+
+# Test
+xcodebuild test -project soundfiles-explorer.xcodeproj -scheme soundfiles-explorer
+xcodebuild test -project soundfiles-explorer.xcodeproj -scheme soundfiles-explorer -only-testing:soundfiles-explorerTests/MyTestClass
+xcodebuild test -project soundfiles-explorer.xcodeproj -scheme soundfiles-explorer -only-testing:soundfiles-explorerTests/MyTestClass/testMethodName
 ```
 
 **Note**: Xcode project (not SPM). No `swift build`.
@@ -129,17 +134,28 @@ guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
 - `NSLayoutConstraint.activate([...])` for batch activation
 - `translatesAutoresizingMaskIntoConstraints = false` for programmatic UI
 
+### Swift Concurrency
+- Use `MainActor` for UI updates
+- Use `async/await` for async operations
+- Wrap UI updates with `await MainActor.run { ... }`
+
 ## Key Files
-- `MVC.swift`: Main view controller
-- `AudioMetadataReader.swift`: BEXT/iXML parsing
-- `AudioWaveformView.swift`: Waveform visualization
-- `AudioPlaybackManager.swift`: Audio playback control
-- `AudioParserError.swift`: Error definitions
+- `MVC.swift`: Main view controller (MVC pattern)
+- `AudioMetadataReader.swift`: BEXT/iXML WAV metadata parsing
+- `AudioWaveformView.swift`: Multi-channel waveform visualization with CALayers
+- `AudioPlaybackManager.swift`: AVAudioPlayer wrapper for playback control
+- `AudioFileLoader.swift`: File loading, waveform generation, and caching
+- `AudioParserError.swift`: Custom error types with LocalizedError conformance
+
+## Swift Version & Deployment
+- Swift 5.0+ with Swift Concurrency (async/await)
+- Deployment target: macOS 14.6+ (Xcode 26.2)
+- Main actor isolation for UI updates
 
 ## Frameworks
-- AppKit (NSView, NSWindow, etc.)
-- AVFoundation (audio, metadata)
-- CoreMedia (CMTime)
+- AppKit (NSView, NSWindow, CALayer, etc.)
+- AVFoundation (AVAudioFile, AVPlayerItem, AVURLAsset, CMTime)
+- CoreMedia (CMTime, AudioStreamBasicDescription)
 - No external dependencies
 
 ## Audio Support
@@ -187,3 +203,4 @@ private func formatTime(_ time: TimeInterval) -> String {
     return String(format: "%d:%02d.%02d", minutes, seconds, milliseconds)
 }
 ```
+

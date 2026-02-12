@@ -77,7 +77,7 @@ class AudioPlaybackManager: NSObject {
     /// Seek to a specific time
     func seek(to time: TimeInterval) {
         guard let player = player else { return }
-        let cmTime = CMTime(seconds: time, preferredTimescale: 100)
+        let cmTime = CMTime(seconds: time, preferredTimescale: 1000)
         player.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
             if finished {
                 self?.currentTime = time

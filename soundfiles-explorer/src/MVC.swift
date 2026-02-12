@@ -35,20 +35,18 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     // MARK: - Outlets
     @IBOutlet weak var tableView: NSTableView!
     @IBOutlet weak var searchField: NSSearchField!
-    @IBOutlet weak var waveformViewPlayer: NSView!
+    @IBOutlet weak var mainStack: NSStackView!
+    
     
     // MARK: - Variables
     private var audioPlaybackManager: AudioPlaybackManager!
     private var waveformView: AudioWaveformView!
-
     private var scrollView: NSScrollView!
     private var controlsStackView: NSStackView!
     private var playPauseButton: NSButton!
     private var zoomSlider: NSSlider!
-    private var mainStack: NSStackView!
     private var channelLabelsContainer: NSStackView!
     private var channelLabelViews: [NSTextField] = []
-
     private var displayLink: CADisplayLink?
     private var audioFiles: [AudioFileInfo] = []
     private var displayedIndices: [Int] = []
@@ -59,10 +57,12 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     private var timeLabel: NSTextField!
     private var channelLabelWidth: CGFloat = 80
     
+    
     // MARK: - Init
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         self.audioPlaybackManager = AudioPlaybackManager()
+        
     }
     
     deinit {
@@ -92,18 +92,12 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     
     // MARK: - Layouts
     func setupLayouts() {
+        
         NSLayoutConstraint.activate([
-            waveformViewPlayer.topAnchor.constraint(equalTo: view.topAnchor, constant: 30),
-            waveformViewPlayer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            waveformViewPlayer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
-            waveformViewPlayer.bottomAnchor.constraint(equalTo: searchField.topAnchor, constant: -10)
-        ])
-                        
-        NSLayoutConstraint.activate([
-            mainStack.topAnchor.constraint(equalTo: waveformViewPlayer.topAnchor),
-            mainStack.leadingAnchor.constraint(equalTo: waveformViewPlayer.leadingAnchor),
-            mainStack.trailingAnchor.constraint(equalTo: waveformViewPlayer.trailingAnchor),
-            mainStack.bottomAnchor.constraint(equalTo: waveformViewPlayer.bottomAnchor)
+            mainStack.topAnchor.constraint(equalTo: view.topAnchor, constant: 20),
+            mainStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            mainStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            mainStack.bottomAnchor.constraint(equalTo: searchField.topAnchor, constant: -10)
         ])
         
         // Find the waveformContainer (first arranged subview of mainStack)
@@ -129,10 +123,12 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         
     // MARK: - Setup Views
     private func setupMainView() {
-        view.frame = NSRect(x: 0, y: 0, width: 1920, height: 1080)
+        // view.frame = visibleFrame //NSRect(x: 0, y: 0, width: 1920, height: 1080)
+        
         view.wantsLayer = true
-        waveformViewPlayer.wantsLayer = true
-        waveformViewPlayer.translatesAutoresizingMaskIntoConstraints = false
+        
+        mainStack.wantsLayer = true
+        mainStack.translatesAutoresizingMaskIntoConstraints = false
     }
     
     
@@ -196,8 +192,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
                         
-        waveformView = AudioWaveformView()
-        waveformView.translatesAutoresizingMaskIntoConstraints = false
+        waveformView = AudioWaveformView()        
         
         scrollView.documentView = waveformView
                 
@@ -225,16 +220,13 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         waveformContainer.layer?.borderWidth = 1.0
         
         setupControls()
-        
-        mainStack = NSStackView(frame: waveformViewPlayer.bounds)
+            
         mainStack.wantsLayer = true
         mainStack.translatesAutoresizingMaskIntoConstraints = false
         mainStack.orientation = .vertical
         mainStack.spacing = 1
         mainStack.addArrangedSubview(waveformContainer)
         mainStack.addArrangedSubview(controlsStackView)
-            
-        waveformViewPlayer.addSubview(mainStack)
     }
     
     private func setupControls() {
@@ -683,7 +675,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     
     // MARK: - Methods
     private func setupDisplayLink() {
-        displayLink = self.waveformViewPlayer.displayLink(target: self, selector: #selector(updatePlaybackPosition))
+        displayLink = self.view.displayLink(target: self, selector: #selector(updatePlaybackPosition))
         displayLink?.isPaused = true
         displayLink?.add(to: .main, forMode: .common)
     }
