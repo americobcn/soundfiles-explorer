@@ -106,6 +106,7 @@ class AudioWaveformView: NSView {
         // Create waveform layer for static content
         waveformLayer = CALayer()
         waveformLayer?.zPosition = 10
+        waveformLayer?.backgroundColor = NSColor(calibratedWhite: 0.6, alpha: 0.05).cgColor
         layer?.addSublayer(waveformLayer!)
         
         // Create cursor layer for playback cursor
@@ -113,12 +114,15 @@ class AudioWaveformView: NSView {
         cursorLayer?.zPosition = 50 // Ensure cursor is on top
         cursorLayer?.backgroundColor = NSColor.init(calibratedRed: 1.0, green: 0, blue: 0, alpha: 1).cgColor
         cursorLayer?.isOpaque = false
+        
+        /// "position": NSNull() -> Prevent sync issues between cursorLayer, waveforms and what is heard.
+        cursorLayer?.actions = [ "position": NSNull()] // , "position": NSNull(), "bounds": NSNull(), "frame": NSNull()
         layer?.addSublayer(cursorLayer!)
         
-        // rulerLayer = CALayer()
-        // rulerLayer?.zPosition = 100
-        // rulerLayer?.backgroundColor = NSColor.darkGray.cgColor
-        // layer?.addSublayer(rulerLayer!)
+        rulerLayer = CALayer()
+        rulerLayer?.zPosition = 100
+        rulerLayer?.backgroundColor = NSColor.darkGray.cgColor        
+        layer?.addSublayer(rulerLayer!)
     }
     
     
@@ -170,8 +174,8 @@ class AudioWaveformView: NSView {
         // Render waveform layer if needed
         if needsWaveformUpdate {
             renderWaveformLayer()
+            drawTimeRuler()
         }
-            
         
         // Update cursor layer (always update on draw)
         updateCursorLayer()
@@ -199,7 +203,7 @@ class AudioWaveformView: NSView {
         
         // Get full content dimensions for scrolling
         let fullContentWidth = getTotalWidth()
-        let rulerRect = NSRect(x: 0, y: self.bounds.height, width: fullContentWidth , height: rulerHeight) //
+        let rulerRect = NSRect(x: 0, y: 0, width: fullContentWidth , height: rulerHeight) //
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
         
