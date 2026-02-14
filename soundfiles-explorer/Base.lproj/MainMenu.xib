@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="23504" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="24506" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
     <dependencies>
         <deployment identifier="macosx"/>
-        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="23504"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="24506"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <objects>
@@ -23,6 +23,7 @@
             <connections>
                 <outlet property="mainStack" destination="kjg-HW-iyx" id="eDQ-Rv-ljP"/>
                 <outlet property="searchField" destination="1bJ-2h-6wJ" id="vhA-H1-Vdm"/>
+                <outlet property="tableScrollView" destination="jUU-Hf-uwt" id="QPQ-m3-bEV"/>
                 <outlet property="tableView" destination="JGO-3D-JlZ" id="aJ1-j4-9xs"/>
                 <outlet property="view" destination="EiT-Mj-1SZ" id="JoO-fj-g1b"/>
             </connections>
@@ -694,7 +695,7 @@
             <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES" resizable="YES"/>
             <windowPositionMask key="initialPositionMask" leftStrut="YES" rightStrut="YES" topStrut="YES" bottomStrut="YES"/>
             <rect key="contentRect" x="335" y="390" width="1920" height="1060"/>
-            <rect key="screenRect" x="0.0" y="0.0" width="2304" height="1271"/>
+            <rect key="screenRect" x="0.0" y="0.0" width="1920" height="1055"/>
             <view key="contentView" autoresizesSubviews="NO" id="EiT-Mj-1SZ">
                 <rect key="frame" x="0.0" y="0.0" width="1920" height="1060"/>
                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>

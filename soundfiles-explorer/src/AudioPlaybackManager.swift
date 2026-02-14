@@ -86,9 +86,9 @@ class AudioPlaybackManager: NSObject {
     }
 
     /// Set playback rate
-    func setRate(_ rate: Float) {
-        player?.rate = rate
-    }
+    // func setRate(_ rate: Float) {        
+    //     player?.rate = rate
+    // }
     
     
     /// Get current playback time directly from AVPlayer for lowest latency

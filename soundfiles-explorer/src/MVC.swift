@@ -34,8 +34,10 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     
     // MARK: - Outlets
     @IBOutlet weak var tableView: NSTableView!
+    @IBOutlet weak var tableScrollView: NSScrollView!
     @IBOutlet weak var searchField: NSSearchField!
     @IBOutlet weak var mainStack: NSStackView!
+    
     
     
     // MARK: - Variables
@@ -94,10 +96,16 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     func setupLayouts() {
         
         NSLayoutConstraint.activate([
+            mainStack.heightAnchor.constraint(greaterThanOrEqualToConstant: 440),
             mainStack.topAnchor.constraint(equalTo: view.topAnchor, constant: 20),
             mainStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             mainStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             mainStack.bottomAnchor.constraint(equalTo: searchField.topAnchor, constant: -10)
+        ])
+        
+        NSLayoutConstraint.activate([
+            searchField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            searchField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
         ])
         
         // Find the waveformContainer (first arranged subview of mainStack)
@@ -113,22 +121,19 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         ])
                                                                                         
         NSLayoutConstraint.activate([
-            tableView.topAnchor.constraint(equalTo: searchField.bottomAnchor),
-            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            tableScrollView.topAnchor.constraint(equalTo: searchField.bottomAnchor,constant: 10),
+            tableScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            tableScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            tableScrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20)
         ])
     }
     
         
     // MARK: - Setup Views
     private func setupMainView() {
-        // view.frame = visibleFrame //NSRect(x: 0, y: 0, width: 1920, height: 1080)
-        
+        view.superview?.window?.zoom(self)
         view.wantsLayer = true
-        
-        mainStack.wantsLayer = true
-        mainStack.translatesAutoresizingMaskIntoConstraints = false
+        searchField.translatesAutoresizingMaskIntoConstraints = false
     }
     
     
@@ -138,6 +143,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         tableView.registerForDraggedTypes([.fileURL])
         tableView.allowsMultipleSelection = true
         tableView.setDraggingSourceOperationMask(.copy, forLocal: false)
+        tableView.translatesAutoresizingMaskIntoConstraints = false
+        tableScrollView.translatesAutoresizingMaskIntoConstraints = false
         
         // SORT DESCRIPTORS
         let fileNameSortDescriptor = NSSortDescriptor(key: TableColumnIdentifiers.fileName.rawValue,
@@ -191,19 +198,23 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         scrollView.hasHorizontalScroller = true
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
-                        
-        waveformView = AudioWaveformView()        
+                                        
+        waveformView = AudioWaveformView()
+        waveformView.layer?.borderColor = NSColor(calibratedWhite: 0.5, alpha: 1.0).cgColor
+        waveformView.layer?.borderWidth = 1.0
         
+        scrollView.documentView?.translatesAutoresizingMaskIntoConstraints = false
         scrollView.documentView = waveformView
-                
+                        
         // Setup channel labels container
         channelLabelsContainer = NSStackView()
         channelLabelsContainer.wantsLayer = true
         channelLabelsContainer.translatesAutoresizingMaskIntoConstraints = false
         channelLabelsContainer.orientation = .vertical
-        channelLabelsContainer.spacing = 1
         channelLabelsContainer.widthAnchor.constraint(equalToConstant: channelLabelWidth).isActive = true
-        channelLabelsContainer.layer?.backgroundColor = NSColor(calibratedWhite: 0.15, alpha: 1.0).cgColor
+        channelLabelsContainer.layer?.backgroundColor = NSColor(calibratedWhite: 0.25, alpha: 1.0).cgColor
+        channelLabelsContainer.layer?.borderColor = NSColor(calibratedWhite: 0.5, alpha: 1.0).cgColor
+        channelLabelsContainer.layer?.borderWidth = 1.0
         channelLabelsContainer.setContentHuggingPriority(NSLayoutConstraint.Priority.required, for: .horizontal)
         channelLabelsContainer.setContentCompressionResistancePriority(NSLayoutConstraint.Priority.required, for: .horizontal)
         
@@ -216,8 +227,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         waveformContainer.alignment = .top
         waveformContainer.addArrangedSubview(channelLabelsContainer)
         waveformContainer.addArrangedSubview(scrollView)
-        waveformContainer.layer?.borderColor = NSColor.gray.cgColor
-        waveformContainer.layer?.borderWidth = 1.0
+        // waveformContainer.layer?.borderColor = NSColor.gray.cgColor
+        // waveformContainer.layer?.borderWidth = 1.0
         
         setupControls()
             
@@ -239,7 +250,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         let zoomLabel = NSTextField(labelWithString: "Zoom:")
         
         // Zoom slider
-        zoomSlider = NSSlider(value: 100, minValue: 10, maxValue: 1000, target: self, action: #selector(zoomChanged))
+        zoomSlider = NSSlider(value: 100, minValue: 10, maxValue: 500, target: self, action: #selector(zoomChanged))
         zoomSlider.widthAnchor.constraint(equalToConstant: 200).isActive = true
         
         // Time label
@@ -256,6 +267,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             zoomSlider,
             timeLabel
         ])
+        
         controlsStackView.translatesAutoresizingMaskIntoConstraints = false
         controlsStackView.wantsLayer = true
         controlsStackView.orientation = .horizontal
@@ -543,33 +555,49 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
 
     // MARK: - Keyboard event handlers
     override func keyDown(with event: NSEvent) {
-            switch event.keyCode {
-            case 51, 117:
-                deleteSelectedRows()
-            case 40, 49: // K or Space Bar
-                playPause()
-                break
-            case 38: // J
-                playRewind()
-                break
-            case 37: // L
-                playForward()
-                break
-            case 36: // Return
-                stopAndGoStartEnd(event.modifierFlags)
-                break
-            /// Zoom
-            case 15: // R
-                zoomSlider.doubleValue = zoomSlider.doubleValue * 0.75
-                waveformView.setZoomLevel(zoomSlider.doubleValue)
-                break
-            case 17: // T
-                zoomSlider.doubleValue = zoomSlider.doubleValue * 1.25
-                waveformView.setZoomLevel(zoomSlider.doubleValue)
-                break
-            default:
-                super.keyDown(with: event)
-            }
+        let modifierFlags = event.modifierFlags
+        let isShiftPressed = modifierFlags.contains(.shift)
+        let isCommandPressed = modifierFlags.contains(.command)
+        
+        switch event.keyCode {
+        case 51, 117:
+            deleteSelectedRows()
+        case 40, 49: // K or Space Bar
+            playPause()
+            break
+        case 38: // J
+            playRewind()
+            break
+        case 37: // L
+            playForward()
+            break
+        case 36: // Return
+            stopAndGoStartEnd(event.modifierFlags)
+            break
+        /// Zoom
+        case 15: // R
+            zoomSlider.doubleValue = zoomSlider.doubleValue * 0.75
+            waveformView.setZoomLevel(zoomSlider.doubleValue)
+            break
+        case 17: // T
+            zoomSlider.doubleValue = zoomSlider.doubleValue * 1.25
+            waveformView.setZoomLevel(zoomSlider.doubleValue)
+            break
+        case 123: // Left arrow
+            let jumpAmount: TimeInterval = isShiftPressed ? 10 : (isCommandPressed ? 1 : 0.1)
+            let currentTime = audioPlaybackManager.getCurrentTimeDirect()
+            let dstTime = max(0, currentTime - jumpAmount)
+            audioPlaybackManager.seek(to: dstTime)
+            break
+        case 124: // Right arrow
+            let jumpAmount: TimeInterval = isShiftPressed ? 10 : (isCommandPressed ? 1 : 0.1)
+            let currentTime = audioPlaybackManager.getCurrentTimeDirect()
+            let dstTime = max(0, currentTime + jumpAmount)
+            audioPlaybackManager.seek(to: dstTime)
+            break
+        default:
+            super.keyDown(with: event)
+        }
     }
     
     
@@ -584,13 +612,14 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         }
     }
     
+    
     @objc private func playRewind() {
-        audioPlaybackManager.setRate(audioPlaybackManager.rate - 1.5)
+        audioPlaybackManager.rate = audioPlaybackManager.rate - 1.5
         audioPlaybackManager.isPlaying = true
     }
     
     @objc private func playForward() {
-        audioPlaybackManager.setRate(audioPlaybackManager.rate + 1.5)
+        audioPlaybackManager.rate = audioPlaybackManager.rate + 1.5
         audioPlaybackManager.isPlaying = true
     }
     
@@ -742,7 +771,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     
     @objc private func waveformViewDidSeek(_ notification: Notification) {
         guard let time = (notification.userInfo?["time"] as? TimeInterval) else { return }
-        print("WFV Time Changed to: \(time)")
         audioPlaybackManager.seek(to: time)
     }
     
@@ -750,8 +778,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         guard let isPlaying = notification.userInfo?["isPlaying"] as? Bool else { return }
         displayLink?.isPaused = !isPlaying
     }
-    
-    
+        
     private func formatTime(_ time: TimeInterval) -> String {
         guard time >= 0 else { return "--" }
         let minutes = Int(time) / 60

@@ -21,7 +21,6 @@ class AudioWaveformView: NSView {
         didSet {
             // Only update cursor layer for better performance
             updateCursorLayer()
-            
         }
     }
     
@@ -42,7 +41,7 @@ class AudioWaveformView: NSView {
     }
     
     /// Visual customization
-    var backgroundColor: NSColor = NSColor.clear //NSColor(calibratedWhite: 0.35, alpha: 0.0)
+    var backgroundColor: NSColor = NSColor.clear
     var waveformColors: [NSColor] = [
         NSColor(calibratedRed: 0.2, green: 0.6, blue: 1.0, alpha: 1.0),
         NSColor(calibratedRed: 1.0, green: 0.4, blue: 0.4, alpha: 1.0),
@@ -95,34 +94,32 @@ class AudioWaveformView: NSView {
     
     required init?(coder: NSCoder) {
         super.init(coder: coder)
-        setupView()
     }
                 
     private func setupView() {
         wantsLayer = true
         translatesAutoresizingMaskIntoConstraints = false
         layer?.zPosition = 1
+        layer?.backgroundColor = NSColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.01).cgColor  // NSColor(calibratedWhite: 1.0, alpha: 0.1).cgColor
         
         // Create waveform layer for static content
         waveformLayer = CALayer()
         waveformLayer?.zPosition = 10
-        waveformLayer?.backgroundColor = NSColor(calibratedWhite: 0.6, alpha: 0.05).cgColor
         layer?.addSublayer(waveformLayer!)
         
         // Create cursor layer for playback cursor
         cursorLayer = CALayer()
         cursorLayer?.zPosition = 50 // Ensure cursor is on top
         cursorLayer?.backgroundColor = NSColor.init(calibratedRed: 1.0, green: 0, blue: 0, alpha: 1).cgColor
-        cursorLayer?.isOpaque = false
-        
+                
         /// "position": NSNull() -> Prevent sync issues between cursorLayer, waveforms and what is heard.
         cursorLayer?.actions = [ "position": NSNull()] // , "position": NSNull(), "bounds": NSNull(), "frame": NSNull()
         layer?.addSublayer(cursorLayer!)
         
-        rulerLayer = CALayer()
-        rulerLayer?.zPosition = 100
-        rulerLayer?.backgroundColor = NSColor.darkGray.cgColor        
-        layer?.addSublayer(rulerLayer!)
+        // rulerLayer = CALayer()
+        // rulerLayer?.zPosition = 100
+        // rulerLayer?.backgroundColor = NSColor.darkGray.cgColor
+        // layer?.addSublayer(rulerLayer!)
     }
     
     
@@ -147,8 +144,7 @@ class AudioWaveformView: NSView {
                 channelNames[idx] = "Ch \(idx + 1)"
             }
         }
-                        
-        
+                                
         // Cache the waveform data
         let cacheKey = "\(duration)-\(sampleRate)-\(channelCount)-\(pixelsPerSecond)" as NSString
         Self.waveformCache.setObject(WaveformCacheEntry(waveforms: waveformData), forKey: cacheKey)
@@ -173,13 +169,13 @@ class AudioWaveformView: NSView {
         
         // Render waveform layer if needed
         if needsWaveformUpdate {
-            renderWaveformLayer()
-            drawTimeRuler()
+            renderWaveformLayer()            
         }
         
         // Update cursor layer (always update on draw)
         updateCursorLayer()
     }
+
     
     private func drawEmptyState(in context: CGContext) {
         let message = "No audio file loaded"
@@ -271,20 +267,7 @@ class AudioWaveformView: NSView {
         needsRulerUpdate = true
     }
     
-    
-    private func drawChannelLabel(_ label: String, at point: NSPoint, in context: CGContext) {
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 11, weight: .medium),
-            .foregroundColor: textColor
-        ]
         
-        let attributedString = NSAttributedString(string: label, attributes: attributes)
-        let size = attributedString.size()
-        attributedString.draw(at: NSPoint(x: point.x  , y: point.y - size.height / 2))
-        
-    }
-    
-    
     private func drawWaveform(_ waveform: [Float], in rect: NSRect, color: NSColor, context: CGContext) {
         guard !waveform.isEmpty else { return }
         
@@ -320,9 +303,7 @@ class AudioWaveformView: NSView {
         // Fill waveform
         color.setFill()
         path.fill()
-                        
         context.restoreGState()
-        
     }
 
     
@@ -345,7 +326,7 @@ class AudioWaveformView: NSView {
         let height = Int(max(fullContentHeight, bounds.height))
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
-        
+                        
         guard let context = CGContext(
             data: nil,
             width: width,
@@ -363,7 +344,7 @@ class AudioWaveformView: NSView {
         // Draw background for full content area
         let fullBounds = NSRect(x: 0, y: 0, width: fullContentWidth, height: CGFloat(height))
         context.setFillColor(NSColor.clear.cgColor)
-        context.fill(fullBounds)
+        context.fill(fullBounds) //fullBounds
         
         // Draw channels
         let channelCount = channelWaveforms.count
@@ -381,21 +362,17 @@ class AudioWaveformView: NSView {
         // Draw each channel across full width
         for (index, waveform) in channelWaveforms.enumerated() {
             let yPosition = startY  + CGFloat(index) * (channelHeight + channelSpacing)
-            let channelRect = NSRect(
-                x: 0,
-                y: yPosition,
-                width: fullContentWidth,
-                height: channelHeight
-            )
+            let channelRect = NSRect(x: 0, y: yPosition, width: fullContentWidth, height: channelHeight)
             
             // Draw channel background
-            // let c = NSColor(calibratedWhite: 1.0, alpha: 0.075)
-            // context.setFillColor(c.cgColor)
-            // context.fill(channelRect)
+            let c = NSColor(calibratedWhite: 0.7, alpha: 0.075)
+            context.setFillColor(c.cgColor)
+            context.fill(channelRect)
             
             // Draw waveform
             let color = waveformColors[index % waveformColors.count]
             drawWaveform(waveform, in: channelRect, color: color, context: context)
+                        
         }
         
         // Set rendered image to layer
@@ -420,16 +397,16 @@ class AudioWaveformView: NSView {
         // Only draw if cursor is visible
         if x >= 0 && x <= bounds.width {
             // Position cursor layer at cursor location
-            cursorLayer.frame = NSRect(x: x, y: 0, width: 2.0, height: bounds.height)            
+            cursorLayer.frame = NSRect(x: x, y: 0, width: 1.0, height: bounds.height)
         }
     }
-    
-    
+        
     /// Invalidates waveform layer to force re-render
     func invalidateWaveformLayer() {
         needsWaveformUpdate = true
         needsDisplay = true
     }
+    
     
     // MARK: - Helper Methods
     
@@ -543,3 +520,31 @@ extension AudioWaveformView {
         Self.waveformCache.setObject(WaveformCacheEntry(waveforms: waveforms), forKey: key as NSString)
     }
 }
+
+
+
+
+
+
+
+
+
+/*************************************************/
+/**     UNUSED                                  **/
+/*************************************************/
+/*
+ private func drawChannelLabel(_ label: String, at point: NSPoint, in context: CGContext) {
+     let attributes: [NSAttributedString.Key: Any] = [
+         .font: NSFont.systemFont(ofSize: 11, weight: .medium),
+         .foregroundColor: textColor
+     ]
+     
+     let attributedString = NSAttributedString(string: label, attributes: attributes)
+     let size = attributedString.size()
+     attributedString.draw(at: NSPoint(x: point.x  , y: point.y - size.height / 2))
+ }
+ 
+ 
+ 
+ 
+*/
