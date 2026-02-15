@@ -153,6 +153,41 @@ class AudioWaveformView: NSView {
         invalidateWaveformLayer()
         updateContentSize()
     }
+    
+    /// Shows loading state when waveform data is not yet available
+    func showLoadingState(duration: TimeInterval, sampleRate: Double, channelCount: Int, names: [Int: String]) {
+        self.channelWaveforms = []
+        self.duration = duration
+        self.sampleRate = sampleRate
+        
+        channelNames = Array(repeating: "", count: channelCount)
+        for idx in 0..<channelCount {
+            if names[idx + 1] != nil && names[idx + 1]?.isEmpty == false {
+                channelNames[idx] = "\(names[idx + 1]!)\nCh \(idx + 1)"
+            } else {
+                channelNames[idx] = "Ch \(idx + 1)"
+            }
+        }
+        
+        // Invalidate waveform layer to show loading state
+        invalidateWaveformLayer()
+        updateContentSize()
+    }
+    
+    /// Clears the waveform view completely
+    func clearWaveform() {
+        self.channelWaveforms = []
+        self.duration = 0
+        self.sampleRate = 0
+        self.channelNames = []
+        
+        // Clear layers
+        waveformLayer?.contents = nil
+        cursorLayer?.contents = nil
+        
+        invalidateWaveformLayer()
+        updateContentSize()
+    }
 
     
     // MARK: - Drawing
@@ -192,6 +227,39 @@ class AudioWaveformView: NSView {
         )
         
         attributedString.draw(at: point)
+    }
+    
+    private func drawLoadingState(in context: CGContext, fullBounds: NSRect) {
+        let message = "Loading waveforms..."
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 14, weight: .medium),
+            .foregroundColor: textColor.withAlphaComponent(0.7)
+        ]
+        
+        let attributedString = NSAttributedString(string: message, attributes: attributes)
+        let size = attributedString.size()
+        let point = NSPoint(
+            x: (fullBounds.width - size.width) / 2,
+            y: (fullBounds.height - size.height) / 2
+        )
+        
+        attributedString.draw(at: point)
+        
+        // Draw placeholder channel backgrounds
+        let channelCount = max(1, channelNames.count)
+        let totalSpacing = CGFloat(channelCount + 1) * channelSpacing
+        let calculatedHeight = CGFloat(channelCount) * channelHeight + totalSpacing
+        let startY = max(0, (fullBounds.height - calculatedHeight) / 2)
+        
+        for idx in 0..<channelCount {
+            let yPosition = startY + channelSpacing + CGFloat(idx) * (channelHeight + channelSpacing)
+            let channelRect = NSRect(x: 0, y: yPosition, width: fullBounds.width, height: channelHeight)
+            
+            // Draw subtle placeholder background
+            let c = NSColor(calibratedWhite: 0.7, alpha: 0.03)
+            context.setFillColor(c.cgColor)
+            context.fill(channelRect)
+        }
     }
     
     private func drawTimeRuler() {
@@ -349,6 +417,10 @@ class AudioWaveformView: NSView {
         // Draw channels
         let channelCount = channelWaveforms.count
         guard channelCount > 0 else {
+            // If duration > 0 but no waveforms, we're in loading state
+            if duration > 0 {
+                drawLoadingState(in: context, fullBounds: fullBounds)
+            }
             // Set rendered image to layer
             if let cgImage = context.makeImage() {
                 waveformLayer.contents = cgImage
@@ -397,7 +469,7 @@ class AudioWaveformView: NSView {
         // Only draw if cursor is visible
         if x >= 0 && x <= bounds.width {
             // Position cursor layer at cursor location
-            cursorLayer.frame = NSRect(x: x, y: 0, width: 1.0, height: bounds.height)
+            cursorLayer.frame = NSRect(x: x, y: 0, width: 2.0, height: bounds.height)
         }
     }
         

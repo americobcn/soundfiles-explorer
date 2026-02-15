@@ -85,7 +85,8 @@ struct AudioFileInfoHelper {
 
 // MARK: - Waveform Data Export
 
-extension AudioWaveformView {
+/*
+extension AudioWaveformView_ {
     
     /// Export waveform data as JSON for external processing
     func exportWaveformData() -> Data? {
@@ -154,7 +155,7 @@ extension AudioWaveformView {
 
 // MARK: - Keyboard Navigation Extension
 
-extension AudioWaveformView {
+extension AudioWaveformView_ {
     
     override var acceptsFirstResponder: Bool {
         return true
@@ -230,7 +231,7 @@ class WaveformRegion {
     }
 }
 
-extension AudioWaveformView {
+extension AudioWaveformView_ {
     
     private static var regionsKey: UInt8 = 0
     
@@ -399,7 +400,7 @@ struct WaveformMarker {
     }
 }
 
-extension AudioWaveformView {
+extension AudioWaveformView_ {
     
     private static var markersKey: UInt8 = 0
     
@@ -424,3 +425,4 @@ extension AudioWaveformView {
         markers = []
     }
 }
+*/

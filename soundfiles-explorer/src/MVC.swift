@@ -346,43 +346,49 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         case .scene:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFile.ixml?.scene ?? "")"
+            viewCell.textField!.stringValue = audioFile.isMetadataLoading ? "Loading..." : "\(audioFile.ixml?.scene ?? "")"
             return viewCell
         case .take:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFile.ixml?.take ?? "")"
+            viewCell.textField!.stringValue = audioFile.isMetadataLoading ? "Loading..." : "\(audioFile.ixml?.take ?? "")"
             return viewCell
         case .takeType:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFile.ixml?.parsedData["TAKE_TYPE"] ?? "")"
+            viewCell.textField!.stringValue = audioFile.isMetadataLoading ? "Loading..." : "\(audioFile.ixml?.parsedData["TAKE_TYPE"] ?? "")"
             return viewCell
         case .tape:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFile.ixml?.parsedData["TAPE"] ?? "")"
+            viewCell.textField!.stringValue = audioFile.isMetadataLoading ? "Loading..." : "\(audioFile.ixml?.parsedData["TAPE"] ?? "")"
             return viewCell
         case .timeCodeStart:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = audioFile.timeCodeStart
+            viewCell.textField!.stringValue = audioFile.isMetadataLoading ? "Loading..." : audioFile.timeCodeStart
             return viewCell
         case .timeCodeRate:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            let tcr = evaluateTimeCodeRate(expressionString: audioFile.ixml?.parsedData["TIMECODE_RATE"] ?? "0")
-            viewCell.textField!.stringValue = "\(tcr) \(audioFile.ixml?.parsedData["TIMECODE_FLAG"] ?? "")"
+            if audioFile.isMetadataLoading {
+                viewCell.textField!.stringValue = "Loading..."
+            } else {
+                let tcr = evaluateTimeCodeRate(expressionString: audioFile.ixml?.parsedData["TIMECODE_RATE"] ?? "0")
+                viewCell.textField!.stringValue = "\(tcr) \(audioFile.ixml?.parsedData["TIMECODE_FLAG"] ?? "")"
+            }
             return viewCell
         case .channels:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFile.channelCount)"
+            viewCell.textField!.stringValue = audioFile.isMetadataLoading ? "Loading..." : "\(audioFile.channelCount)"
             return viewCell
         case .circled:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            if let circled = audioFile.ixml?.parsedData["CIRCLED"] {
+            if audioFile.isMetadataLoading {
+                viewCell.textField!.stringValue = "Loading..."
+            } else if let circled = audioFile.ixml?.parsedData["CIRCLED"] {
                 switch circled.lowercased() {
                 case "true":
                     viewCell.textField!.stringValue = "√"
@@ -394,23 +400,27 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         case .date:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFile.bext?.originationDate ?? "")"
+            viewCell.textField!.stringValue = audioFile.isMetadataLoading ? "Loading..." : "\(audioFile.bext?.originationDate ?? "")"
             return viewCell
         case .time:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFile.bext?.originationTime ?? "")"
+            viewCell.textField!.stringValue = audioFile.isMetadataLoading ? "Loading..." : "\(audioFile.bext?.originationTime ?? "")"
             return viewCell
         case .audioDescription:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = "\(audioFile.bitDepth)b \(audioFile.sampleRate)Hz"
+            viewCell.textField!.stringValue = audioFile.isMetadataLoading ? "Loading..." : "\(audioFile.bitDepth)b \(audioFile.sampleRate)Hz"
             return viewCell
         case .duration:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            let audioLength = formatTime(audioFile.duration)
-            viewCell.textField!.stringValue = "\(audioLength)"
+            if audioFile.isMetadataLoading {
+                viewCell.textField!.stringValue = "Loading..."
+            } else {
+                let audioLength = formatTime(audioFile.duration)
+                viewCell.textField!.stringValue = "\(audioLength)"
+            }
             return viewCell
         default:
             return nil
@@ -430,19 +440,31 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             
             Task {
                 let fileInfo = audioFiles[actualIndex]
-                // Update waveform view with pre-generated data
-                waveformView.setWaveformData(fileInfo.waveformData,
-                                             duration: fileInfo.duration,
-                                             sampleRate: fileInfo.sampleRate,
-                                             channelCount: fileInfo.channelCount,
-                                             names: fileInfo.tracksNames
-                )
-                                                                
-                // Update channel labels
-                setupChannelLabels()
                 
-                // Update playback manager with player item
-                audioPlaybackManager.setPlayerItem(fileInfo.playerItem, duration: Float64(fileInfo.duration))                
+                // Setup playback immediately (playerItem is created right away)
+                if let playerItem = fileInfo.playerItem {
+                    // Update waveform view with data (may be nil if still loading)
+                    if let waveformData = fileInfo.waveformData {
+                        waveformView.setWaveformData(waveformData,
+                                                     duration: fileInfo.duration,
+                                                     sampleRate: fileInfo.sampleRate,
+                                                     channelCount: fileInfo.channelCount,
+                                                     names: fileInfo.tracksNames
+                        )
+                    } else {
+                        // Show loading state (waveforms not ready yet)
+                        waveformView.showLoadingState(duration: fileInfo.duration,
+                                                      sampleRate: fileInfo.sampleRate,
+                                                      channelCount: fileInfo.channelCount,
+                                                      names: fileInfo.tracksNames)
+                    }
+                    
+                    // Update channel labels
+                    setupChannelLabels()
+                    
+                    // Update playback manager with player item
+                    audioPlaybackManager.setPlayerItem(playerItem, duration: Float64(fileInfo.duration))
+                }
             }
         }
                                                                     
@@ -509,20 +531,26 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                 return false
             }
             notLoadedFiles.removeAll()
-            pasteboardObjects.forEach { (object) in
-                if let url = object as? URL {
-                Task {
-                    do {
-                        let fileInfo = try await audioFileLoader.loadAudioFile(url)
-                        self.audioFiles.append(fileInfo)
-                        await MainActor.run {
-                            self.applyFilter()
-                            self.tableView.reloadData()
+            
+            // Collect all URLs first
+            let urls = pasteboardObjects.compactMap { $0 as? URL }
+            
+            // Create file info objects synchronously (immediate)
+            let fileInfos = urls.map { audioFileLoader.createFileInfo(url: $0) }
+            audioFiles.append(contentsOf: fileInfos)
+            
+            // Update table view once after all files added
+            applyFilter()
+            tableView.reloadData()
+            
+            // Use TaskGroup for proper parallel background loading
+            Task(priority: .userInitiated) {
+                await withThrowingTaskGroup(of: Void.self) { group in
+                    for fileInfo in fileInfos {
+                        group.addTask(priority: .background) {
+                            await self.audioFileLoader.loadMetadataAndWaveforms(for: fileInfo)
                         }
-                    } catch {
-                        self.notLoadedFiles.append(url.lastPathComponent)
                     }
-                }
                 }
             }
                         
@@ -766,7 +794,64 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             name: NSNotification.Name("AudioPlaybackStateChanged"),
             object: audioPlaybackManager
         )
-                
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(waveformGenerationCompleted(_:)),
+            name: NSNotification.Name("WaveformGenerationCompleted"),
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(fileMetadataLoaded(_:)),
+            name: NSNotification.Name("FileMetadataLoaded"),
+            object: nil
+        )
+    }
+    
+    @objc private func fileMetadataLoaded(_ notification: Notification) {
+        guard let url = notification.userInfo?["url"] as? URL else { return }
+        
+        // Find the file and reload its table row on main thread
+        if let index = audioFiles.firstIndex(where: { $0.url == url }) {
+            // Find which displayed row corresponds to this index
+            if let displayedRow = displayedIndices.firstIndex(of: index) {
+                DispatchQueue.main.async {
+                    self.tableView.reloadData(forRowIndexes: IndexSet([displayedRow]), columnIndexes: IndexSet(integersIn: 0..<self.tableView.numberOfColumns))
+                }
+            }
+        }
+    }
+    
+    @objc private func waveformGenerationCompleted(_ notification: Notification) {
+        guard let url = notification.userInfo?["url"] as? URL,
+              let waveformData = notification.userInfo?["waveformData"] as? [[Float]] else {
+            return
+        }
+        
+        // Find and update the audio file info
+        if let index = audioFiles.firstIndex(where: { $0.url == url }) {
+            audioFiles[index].waveformData = waveformData
+            audioFiles[index].isWaveformLoading = false
+            
+            // If this file is currently selected, update the waveform view
+            let selectedRow = tableView.selectedRow
+            if selectedRow >= 0 && selectedRow < displayedIndices.count {
+                let displayedIndex = displayedIndices[selectedRow]
+                if displayedIndex == index {
+                    Task { @MainActor in
+                        waveformView.setWaveformData(
+                            waveformData,
+                            duration: audioFiles[index].duration,
+                            sampleRate: audioFiles[index].sampleRate,
+                            channelCount: audioFiles[index].channelCount,
+                            names: audioFiles[index].tracksNames
+                        )
+                    }
+                }
+            }
+        }
     }
     
     @objc private func waveformViewDidSeek(_ notification: Notification) {
