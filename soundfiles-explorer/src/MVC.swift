@@ -458,14 +458,23 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                                                       channelCount: fileInfo.channelCount,
                                                       names: fileInfo.tracksNames)
                     }
-                    
                     // Update channel labels
                     setupChannelLabels()
                     
                     // Update playback manager with player item
                     audioPlaybackManager.setPlayerItem(playerItem, duration: Float64(fileInfo.duration))
+                    audioPlaybackManager.seek(to: 0.0)
+                    waveformView.currentTime = 0.0
                 }
             }
+        } else {
+            // Clear everything when no file is selected (e.g., all files removed)
+            if audioPlaybackManager.isPlaying {
+                audioPlaybackManager.stop()
+            }
+            waveformView.clearWaveform()
+            setupChannelLabels() // This will clear labels since waveformView.channelNames will be empty
+            timeLabel.stringValue = "0:00.00 / 0:00.00"
         }
                                                                     
             #if DEBUG
