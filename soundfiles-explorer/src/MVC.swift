@@ -200,8 +200,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         scrollView.autohidesScrollers = true
                                         
         waveformView = AudioWaveformView()
-        waveformView.layer?.borderColor = NSColor(calibratedWhite: 0.5, alpha: 1.0).cgColor
-        waveformView.layer?.borderWidth = 1.0
         
         scrollView.documentView?.translatesAutoresizingMaskIntoConstraints = false
         scrollView.documentView = waveformView
@@ -227,8 +225,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         waveformContainer.alignment = .top
         waveformContainer.addArrangedSubview(channelLabelsContainer)
         waveformContainer.addArrangedSubview(scrollView)
-        // waveformContainer.layer?.borderColor = NSColor.gray.cgColor
-        // waveformContainer.layer?.borderWidth = 1.0
         
         setupControls()
             
