@@ -49,7 +49,8 @@ final class AudioFileLoader {
     // MARK: - Properties
     
     private let waveformCache: NSCache<NSString, WaveformCacheEntry>
-    
+    private let diskCache = WaveformDiskCache()
+
     private class WaveformCacheEntry: NSObject {
         let waveforms: [[Float]]
         init(waveforms: [[Float]]) {
@@ -57,11 +58,11 @@ final class AudioFileLoader {
             super.init()
         }
     }
-    
+
     private let audioMetadataReader: AudioMetadataReader?
-    
+
     // MARK: - Initialization
-    
+
     init(cacheLimit: Int = 1000) {
         waveformCache = NSCache<NSString, WaveformCacheEntry>()
         waveformCache.countLimit = cacheLimit
@@ -205,12 +206,18 @@ final class AudioFileLoader {
         // Calculate pixels per second for caching (default 100)
         let pixelsPerSecond: CGFloat = 100
         
-        // Check cache first
+        // L1: in-memory cache
         let cacheKey = "\(url.absoluteString)-\(pixelsPerSecond)" as NSString
         if let cachedEntry = waveformCache.object(forKey: cacheKey) {
             return cachedEntry.waveforms
         }
-        
+
+        // L2: disk cache
+        if let cached = diskCache.load(for: url) {
+            waveformCache.setObject(WaveformCacheEntry(waveforms: cached), forKey: cacheKey)
+            return cached
+        }
+
         // Determine samples per point
         let desiredWaveformPoints = Int(duration * Double(pixelsPerSecond))
         let samplesPerPoint = max(1, totalSamples / desiredWaveformPoints)
@@ -263,17 +270,20 @@ final class AudioFileLoader {
             }
         }
         
-        // Cache the waveform data
-        waveformCache.setObject(WaveformCacheEntry(waveforms: Array(channelMaxValues)), forKey: cacheKey)
-        
-        return Array(channelMaxValues)
+        let waveforms = Array(channelMaxValues)
+
+        // Cache the waveform data (L1 + L2)
+        waveformCache.setObject(WaveformCacheEntry(waveforms: waveforms), forKey: cacheKey)
+        diskCache.save(waveforms, for: url)
+
+        return waveforms
     }
     
     
     func timecodeFromTimeReference(samples: Int64, sampleRate: Double, frameRate: Double) -> String {
         // Convert samples to seconds
         let seconds = Double(samples) / sampleRate
-        
+
         // Convert seconds to timecode components
         let totalFrames = Int64(seconds * frameRate)
         let frames = totalFrames % Int64(frameRate)
@@ -281,8 +291,89 @@ final class AudioFileLoader {
         let secs = secondsTotal % 60
         let mins = (secondsTotal / 60) % 60
         let hours = secondsTotal / 3600
-        
+
         return String(format: "%02d:%02d:%02d:%02d", hours, mins, secs, frames)
     }
 
+}
+
+// MARK: - Waveform Disk Cache
+
+/// Binary on-disk waveform cache stored in ~/Library/Caches/<BundleID>/waveforms/
+/// Cache entries are invalidated when the source file's modification date changes.
+///
+/// Binary format:
+///   Bytes 0-3:   Magic "WFCX"
+///   Bytes 4-7:   Int32 LE: channel count
+///   Bytes 8-11:  Int32 LE: samples per channel
+///   Bytes 12+:   Float32 values, channel 0 first, then channel 1, etc.
+private final class WaveformDiskCache {
+
+    private static let magic: [UInt8] = [0x57, 0x46, 0x43, 0x58] // "WFCX"
+    private let cacheDirectory: URL
+
+    init() {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        let bundleID = Bundle.main.bundleIdentifier ?? "soundfiles-explorer"
+        cacheDirectory = base.appendingPathComponent(bundleID).appendingPathComponent("waveforms")
+        try? FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+    }
+
+    // MARK: - Public
+
+    func load(for audioURL: URL) -> [[Float]]? {
+        let fileURL = cacheFileURL(for: audioURL)
+        guard let data = try? Data(contentsOf: fileURL) else { return nil }
+        return decode(data)
+    }
+
+    func save(_ waveforms: [[Float]], for audioURL: URL) {
+        let fileURL = cacheFileURL(for: audioURL)
+        let data = encode(waveforms)
+        try? data.write(to: fileURL, options: .atomic)
+    }
+
+    // MARK: - Private
+
+    private func cacheFileURL(for audioURL: URL) -> URL {
+        let modDate = (try? FileManager.default.attributesOfItem(atPath: audioURL.path)[.modificationDate] as? Date) ?? Date.distantPast
+        let key = "\(audioURL.absoluteString)-\(modDate.timeIntervalSinceReferenceDate)"
+        let hashValue = abs(key.hashValue)
+        return cacheDirectory.appendingPathComponent("\(hashValue).wfcache")
+    }
+
+    private func encode(_ waveforms: [[Float]]) -> Data {
+        var data = Data()
+        data.append(contentsOf: WaveformDiskCache.magic)
+        var channelCount = Int32(waveforms.count)
+        data.append(contentsOf: withUnsafeBytes(of: &channelCount) { Array($0) })
+        var samplesPerChannel = Int32(waveforms.first?.count ?? 0)
+        data.append(contentsOf: withUnsafeBytes(of: &samplesPerChannel) { Array($0) })
+        for channel in waveforms {
+            var mutableChannel = channel
+            data.append(contentsOf: mutableChannel.withUnsafeMutableBytes { Array($0) })
+        }
+        return data
+    }
+
+    private func decode(_ data: Data) -> [[Float]]? {
+        guard data.count >= 12 else { return nil }
+        let magic = [UInt8](data[0..<4])
+        guard magic == WaveformDiskCache.magic else { return nil }
+        let channelCount = Int(data.withUnsafeBytes { $0.load(fromByteOffset: 4, as: Int32.self) })
+        let samplesPerChannel = Int(data.withUnsafeBytes { $0.load(fromByteOffset: 8, as: Int32.self) })
+        guard channelCount > 0, samplesPerChannel > 0 else { return nil }
+        let expectedSize = 12 + channelCount * samplesPerChannel * 4
+        guard data.count >= expectedSize else { return nil }
+        var waveforms: [[Float]] = []
+        for i in 0..<channelCount {
+            let offset = 12 + i * samplesPerChannel * 4
+            let channel: [Float] = data.withUnsafeBytes { ptr in
+                let floatPtr = ptr.baseAddress!.advanced(by: offset).assumingMemoryBound(to: Float.self)
+                return Array(UnsafeBufferPointer(start: floatPtr, count: samplesPerChannel))
+            }
+            waveforms.append(channel)
+        }
+        return waveforms
+    }
 }
