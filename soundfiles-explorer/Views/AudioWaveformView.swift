@@ -105,6 +105,10 @@ class AudioWaveformView: NSView {
         // Create waveform layer for static content
         waveformLayer = CALayer()
         waveformLayer?.zPosition = 10
+        waveformLayer?.actions = ["position": NSNull(), "bounds": NSNull(), "frame": NSNull()]
+        waveformLayer?.borderColor = NSColor(calibratedWhite: 0.5, alpha: 1.0).cgColor
+        waveformLayer?.borderWidth = 1.0
+        
         layer?.addSublayer(waveformLayer!)
         
         // Create cursor layer for playback cursor
@@ -113,7 +117,7 @@ class AudioWaveformView: NSView {
         cursorLayer?.backgroundColor = NSColor.init(calibratedRed: 1.0, green: 0, blue: 0, alpha: 1).cgColor
                 
         /// "position": NSNull() -> Prevent sync issues between cursorLayer, waveforms and what is heard.
-        cursorLayer?.actions = [ "position": NSNull()] // , "position": NSNull(), "bounds": NSNull(), "frame": NSNull()
+        cursorLayer?.actions = [ "position": NSNull(), "bounds": NSNull(), "frame": NSNull()] // , "position": NSNull(), "bounds": NSNull(), "frame": NSNull()
         layer?.addSublayer(cursorLayer!)
         
         // rulerLayer = CALayer()

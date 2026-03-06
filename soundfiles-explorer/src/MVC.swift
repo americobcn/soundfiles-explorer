@@ -200,8 +200,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         scrollView.autohidesScrollers = true
                                         
         waveformView = AudioWaveformView()
-        waveformView.layer?.borderColor = NSColor(calibratedWhite: 0.5, alpha: 1.0).cgColor
-        waveformView.layer?.borderWidth = 1.0
         
         scrollView.documentView?.translatesAutoresizingMaskIntoConstraints = false
         scrollView.documentView = waveformView
@@ -227,8 +225,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         waveformContainer.alignment = .top
         waveformContainer.addArrangedSubview(channelLabelsContainer)
         waveformContainer.addArrangedSubview(scrollView)
-        // waveformContainer.layer?.borderColor = NSColor.gray.cgColor
-        // waveformContainer.layer?.borderWidth = 1.0
         
         setupControls()
             
@@ -458,14 +454,23 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                                                       channelCount: fileInfo.channelCount,
                                                       names: fileInfo.tracksNames)
                     }
-                    
                     // Update channel labels
                     setupChannelLabels()
                     
                     // Update playback manager with player item
                     audioPlaybackManager.setPlayerItem(playerItem, duration: Float64(fileInfo.duration))
+                    audioPlaybackManager.seek(to: 0.0)
+                    waveformView.currentTime = 0.0
                 }
             }
+        } else {
+            // Clear everything when no file is selected (e.g., all files removed)
+            if audioPlaybackManager.isPlaying {
+                audioPlaybackManager.stop()
+            }
+            waveformView.clearWaveform()
+            setupChannelLabels() // This will clear labels since waveformView.channelNames will be empty
+            timeLabel.stringValue = "0:00.00 / 0:00.00"
         }
                                                                     
             #if DEBUG
