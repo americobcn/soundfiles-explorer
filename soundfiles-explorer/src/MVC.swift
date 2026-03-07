@@ -548,12 +548,13 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             applyFilter()
             tableView.reloadData()
             
-            // Use TaskGroup for proper parallel background loading
-            Task(priority: .userInitiated) {
-                await withThrowingTaskGroup(of: Void.self) { group in
+            // Use Task.detached to break @MainActor inheritance (Swift 5.10 / macOS Sequoia fix)
+            let loader = audioFileLoader
+            Task.detached(priority: .utility) {
+                await withTaskGroup(of: Void.self) { group in
                     for fileInfo in fileInfos {
-                        group.addTask(priority: .background) {
-                            await self.audioFileLoader.loadMetadataAndWaveforms(for: fileInfo)
+                        group.addTask {
+                            await loader.loadMetadataAndWaveforms(for: fileInfo)
                         }
                     }
                 }

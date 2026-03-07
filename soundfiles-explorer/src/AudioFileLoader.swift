@@ -88,7 +88,7 @@ final class AudioFileLoader {
     /// Loads metadata and waveforms for an existing AudioFileInfo
     /// This runs in background and updates the fileInfo object directly
     /// - Parameter fileInfo: The AudioFileInfo to load data into
-    func loadMetadataAndWaveforms(for fileInfo: AudioFileInfo) async {
+    nonisolated func loadMetadataAndWaveforms(for fileInfo: AudioFileInfo) async {
         await loadFileMetadataAndWaveforms(fileInfo: fileInfo)
     }
     
@@ -97,7 +97,7 @@ final class AudioFileLoader {
     /// Loads all file metadata and waveforms in the background
     /// Uses @concurrent to force execution on background thread
     // @concurrent
-    private func loadFileMetadataAndWaveforms(fileInfo: AudioFileInfo) async {
+    private nonisolated func loadFileMetadataAndWaveforms(fileInfo: AudioFileInfo) async {
         do {
             // With @concurrent, this blocking call runs on background thread
             // Load audio file for basic info
@@ -109,20 +109,10 @@ final class AudioFileLoader {
             fileInfo.channelCount = Int(format.channelCount)
             fileInfo.duration = Double(audioFile.length) / fileInfo.sampleRate
             
-            // Create AVURLAsset and extract ASBD for playback and metadata
-            let loadOptions = [AVURLAssetPreferPreciseDurationAndTimingKey: true]
-            let asset = AVURLAsset(url: fileInfo.url, options: loadOptions)
-            
-            guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
-                throw AudioParserError.noAudioTrack
-            }
-            
-            guard let asbdPointer = try await track.load(.formatDescriptions).first?.audioFormatList.first?.mASBD else {
-                throw AudioParserError.malformedMetadata
-            }
-            
-            fileInfo.asbd = asbdPointer
-            fileInfo.bitDepth = Int(asbdPointer.mBitsPerChannel)
+            // Extract ASBD synchronously from processingFormat — no async calls, no main thread involvement
+            let asbd = format.streamDescription.pointee
+            fileInfo.asbd = asbd
+            fileInfo.bitDepth = Int(asbd.mBitsPerChannel)
             
             // Load audio metadata
             if let audioMetadata = try audioMetadataReader?.readAudioMetadata(from: fileInfo.url) {
@@ -164,8 +154,8 @@ final class AudioFileLoader {
             
             // Start waveform generation in a SEPARATE parallel task
             // This allows metadata to display immediately while waveforms generate in background
-            Task {
-                await generateWaveformsInBackground(audioFile: audioFile, fileInfo: fileInfo)
+            Task.detached { [self] in
+                await self.generateWaveformsInBackground(audioFile: audioFile, fileInfo: fileInfo)
             }
             
         } catch {
@@ -176,7 +166,7 @@ final class AudioFileLoader {
     }
     
     /// Generates waveforms in a separate background task
-    private func generateWaveformsInBackground(audioFile: AVAudioFile, fileInfo: AudioFileInfo) async {
+    private nonisolated func generateWaveformsInBackground(audioFile: AVAudioFile, fileInfo: AudioFileInfo) async {
         do {
             fileInfo.isWaveformLoading = true
             let waveformData = try await generateWaveforms(from: audioFile, url: fileInfo.url)
@@ -197,7 +187,7 @@ final class AudioFileLoader {
         }
     }
     
-    private func generateWaveforms(from file: AVAudioFile, url: URL) async throws -> [[Float]] {
+    private nonisolated func generateWaveforms(from file: AVAudioFile, url: URL) async throws -> [[Float]] {
         let format = file.processingFormat
         let totalSamples = Int(file.length)
         let channelCount = Int(format.channelCount)
@@ -321,13 +311,13 @@ private final class WaveformDiskCache {
 
     // MARK: - Public
 
-    func load(for audioURL: URL) -> [[Float]]? {
+    nonisolated func load(for audioURL: URL) -> [[Float]]? {
         let fileURL = cacheFileURL(for: audioURL)
         guard let data = try? Data(contentsOf: fileURL) else { return nil }
         return decode(data)
     }
 
-    func save(_ waveforms: [[Float]], for audioURL: URL) {
+    nonisolated func save(_ waveforms: [[Float]], for audioURL: URL) {
         let fileURL = cacheFileURL(for: audioURL)
         let data = encode(waveforms)
         try? data.write(to: fileURL, options: .atomic)
@@ -335,14 +325,14 @@ private final class WaveformDiskCache {
 
     // MARK: - Private
 
-    private func cacheFileURL(for audioURL: URL) -> URL {
+    private nonisolated func cacheFileURL(for audioURL: URL) -> URL {
         let modDate = (try? FileManager.default.attributesOfItem(atPath: audioURL.path)[.modificationDate] as? Date) ?? Date.distantPast
         let key = "\(audioURL.absoluteString)-\(modDate.timeIntervalSinceReferenceDate)"
         let hashValue = abs(key.hashValue)
         return cacheDirectory.appendingPathComponent("\(hashValue).wfcache")
     }
 
-    private func encode(_ waveforms: [[Float]]) -> Data {
+    private nonisolated func encode(_ waveforms: [[Float]]) -> Data {
         var data = Data()
         data.append(contentsOf: WaveformDiskCache.magic)
         var channelCount = Int32(waveforms.count)
@@ -356,7 +346,7 @@ private final class WaveformDiskCache {
         return data
     }
 
-    private func decode(_ data: Data) -> [[Float]]? {
+    private nonisolated func decode(_ data: Data) -> [[Float]]? {
         guard data.count >= 12 else { return nil }
         let magic = [UInt8](data[0..<4])
         guard magic == WaveformDiskCache.magic else { return nil }
