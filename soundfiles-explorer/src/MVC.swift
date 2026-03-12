@@ -746,6 +746,15 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         self.waveformView.currentTime = ct
         self.updateTimeLabel(ct)
         self.scrollToFollowPlayback(ct)
+
+        // Stop at region end when a selection is active
+        if let region = waveformView.selectionRegion,
+           audioPlaybackManager.isPlaying,
+           ct >= region.end {
+            audioPlaybackManager.pause()
+            // AudioPlaybackStateChanged will pause the display link on next tick;
+            // isPlaying guard above prevents a double-pause.
+        }
     }
     
     
