@@ -545,7 +545,7 @@ class AudioWaveformView: NSView {
             waveformLayer.contents = cgImage
         }
         
-        needsWaveformUpdate = true
+        needsWaveformUpdate = false
     }
     
     /// Updates all selection layer frames and visibility. Called whenever selectionRegion changes.
@@ -594,12 +594,6 @@ class AudioWaveformView: NSView {
             height: badgeH
         )
 
-        // Post selection-changed notification
-        NotificationCenter.default.post(
-            name: NSNotification.Name("AudioWaveformViewSelectionChanged"),
-            object: self,
-            userInfo: ["start": region.start, "end": region.end]
-        )
     }
 
     /// Updates cursor layer with current playback position
@@ -797,11 +791,24 @@ class AudioWaveformView: NSView {
                     object: self,
                     userInfo: ["time": seekTime]
                 )
+            } else if let region = selectionRegion {
+                // Valid selection finalised — notify once (not on every drag tick).
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("AudioWaveformViewSelectionChanged"),
+                    object: self,
+                    userInfo: ["start": region.start, "end": region.end]
+                )
             }
-            // If selection is valid (>= 50ms), keep it — no seek.
 
         case .resizingLeft, .resizingRight:
-            // Region already normalized by mouseDragged; nothing to do.
+            // Region already normalized by mouseDragged; notify observers of final value.
+            if let region = selectionRegion {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("AudioWaveformViewSelectionChanged"),
+                    object: self,
+                    userInfo: ["start": region.start, "end": region.end]
+                )
+            }
             break
 
         case .idle:
