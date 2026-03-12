@@ -680,20 +680,168 @@ class AudioWaveformView: NSView {
         return CGFloat(duration) * pixelsPerSecond
     }
         
+    // MARK: - Selection Interaction State
+
+    private enum DragState {
+        case idle
+        case draggingNewSelection(anchorTime: TimeInterval)
+        case resizingLeft(originalEnd: TimeInterval)
+        case resizingRight(originalStart: TimeInterval)
+    }
+
+    private var dragState: DragState = .idle
+    private var selectionTrackingArea: NSTrackingArea?
+
     // MARK: - Mouse Interaction
-    
+
+    /// Returns the X position in view coordinates of the left/right selection handles.
+    private func selectionHandleX() -> (left: CGFloat, right: CGFloat)? {
+        guard let region = selectionRegion else { return nil }
+        return (
+            left:  CGFloat(region.start) * pixelsPerSecond,
+            right: CGFloat(region.end)   * pixelsPerSecond
+        )
+    }
+
     override func mouseDown(with event: NSEvent) {
         let location = convert(event.locationInWindow, from: nil)
-        if location.x >= 0 {
-            let clickedTime =  TimeInterval((location.x) / pixelsPerSecond)
-            currentTime = max(0, min(duration, clickedTime))
-            
-            // Notify delegate or post notification for seeking
+        guard location.x >= 0 else { return }
+
+        let clickedTime = TimeInterval(location.x / pixelsPerSecond)
+        let edgeHitZone: CGFloat = 8
+
+        // Branch 1 & 2: edge resize hit-test (takes priority over everything)
+        if let handles = selectionHandleX() {
+            if abs(location.x - handles.left) <= edgeHitZone {
+                dragState = .resizingLeft(originalEnd: selectionRegion!.end)
+                return
+            }
+            if abs(location.x - handles.right) <= edgeHitZone {
+                dragState = .resizingRight(originalStart: selectionRegion!.start)
+                return
+            }
+        }
+
+        // Branch 3: click inside existing selection → deselect, no seek
+        if let region = selectionRegion,
+           clickedTime >= region.start && clickedTime <= region.end {
+            selectionRegion = nil
+            dragState = .idle
             NotificationCenter.default.post(
-                name: NSNotification.Name("AudioWaveformViewDidSeek"),
+                name: NSNotification.Name("AudioWaveformViewSelectionChanged"),
                 object: self,
-                userInfo: ["time": currentTime]
+                userInfo: nil
             )
+            return
+        }
+
+        // Branch 4: click outside → start a new selection drag (no seek while dragging)
+        selectionRegion = nil
+        dragState = .draggingNewSelection(anchorTime: clickedTime)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        let location = convert(event.locationInWindow, from: nil)
+        let nowTime = TimeInterval(max(0, location.x) / pixelsPerSecond).clamped(to: 0...duration)
+
+        switch dragState {
+        case .draggingNewSelection(let anchor):
+            selectionRegion = (start: min(anchor, nowTime), end: max(anchor, nowTime))
+
+        case .resizingLeft(let originalEnd):
+            let newStart = min(nowTime, originalEnd)
+            let newEnd   = max(nowTime, originalEnd)
+            selectionRegion = (start: newStart, end: newEnd)
+            if nowTime > originalEnd {
+                dragState = .resizingRight(originalStart: originalEnd)
+            }
+            durationBadgeLayer?.backgroundColor = NSColor(calibratedRed: 1, green: 0.77, blue: 0, alpha: 0.35).cgColor
+
+        case .resizingRight(let originalStart):
+            let newStart = min(nowTime, originalStart)
+            let newEnd   = max(nowTime, originalStart)
+            selectionRegion = (start: newStart, end: newEnd)
+            if nowTime < originalStart {
+                dragState = .resizingLeft(originalEnd: originalStart)
+            }
+            durationBadgeLayer?.backgroundColor = NSColor(calibratedRed: 1, green: 0.77, blue: 0, alpha: 0.35).cgColor
+
+        case .idle:
+            break
+        }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        defer { dragState = .idle }
+
+        // Reset badge tint to default translucent white
+        durationBadgeLayer?.backgroundColor = NSColor(calibratedWhite: 1, alpha: 0.12).cgColor
+
+        switch dragState {
+        case .draggingNewSelection(let anchorTime):
+            // Discard tiny accidental selections (< 50ms) and treat as a seek click instead.
+            // Use anchorTime (from mouseDown) as the seek target — original press position.
+            if let region = selectionRegion, region.end - region.start < 0.05 {
+                selectionRegion = nil
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("AudioWaveformViewSelectionChanged"),
+                    object: self,
+                    userInfo: nil
+                )
+                let seekTime = max(0, min(duration, anchorTime))
+                currentTime = seekTime
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("AudioWaveformViewDidSeek"),
+                    object: self,
+                    userInfo: ["time": seekTime]
+                )
+            }
+            // If selection is valid (>= 50ms), keep it — no seek.
+
+        case .resizingLeft, .resizingRight:
+            // Region already normalized by mouseDragged; nothing to do.
+            break
+
+        case .idle:
+            // mouseDown always transitions out of .idle, so this is unreachable in normal usage.
+            break
+        }
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let old = selectionTrackingArea {
+            removeTrackingArea(old)
+        }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseMoved, .cursorUpdate, .activeInKeyWindow],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        selectionTrackingArea = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        updateCursorForLocation(convert(event.locationInWindow, from: nil))
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        updateCursorForLocation(convert(event.locationInWindow, from: nil))
+    }
+
+    private func updateCursorForLocation(_ location: CGPoint) {
+        guard let handles = selectionHandleX() else {
+            NSCursor.arrow.set()
+            return
+        }
+        let edgeHitZone: CGFloat = 8
+        if abs(location.x - handles.left) <= edgeHitZone ||
+           abs(location.x - handles.right) <= edgeHitZone {
+            NSCursor.resizeLeftRight.set()
+        } else {
+            NSCursor.arrow.set()
         }
     }
 }
@@ -732,11 +880,20 @@ extension AudioWaveformView {
 // MARK: - Waveform Caching
 
 extension AudioWaveformView {
-    
+
     /// Cache waveform data to avoid regeneration
     /// Note: NSCache automatically handles eviction, no manual cleanup needed
     private func cacheWaveform(_ key: String, waveforms: [[Float]]) {
         Self.waveformCache.setObject(WaveformCacheEntry(waveforms: waveforms), forKey: key as NSString)
+    }
+}
+
+
+// MARK: - Private Utilities
+
+private extension Comparable {
+    func clamped(to range: ClosedRange<Self>) -> Self {
+        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }
 
