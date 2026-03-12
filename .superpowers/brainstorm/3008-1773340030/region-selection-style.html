@@ -1,0 +1,127 @@
+<h2>Region Selection Visual Style</h2>
+<p class="subtitle">How should the selected region appear in the waveform view? Pick the style that feels right for a pro audio tool.</p>
+
+<div class="cards">
+
+  <!-- Option A: Translucent blue fill + white handles -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;background:#1a1a1a;border-radius:6px;overflow:hidden;">
+      <svg viewBox="0 0 420 110" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;">
+        <!-- Ruler -->
+        <rect x="0" y="0" width="420" height="18" fill="#2a2a2a"/>
+        <text x="40" y="13" fill="#888" font-size="9" font-family="monospace">0:01</text>
+        <text x="120" y="13" fill="#888" font-size="9" font-family="monospace">0:02</text>
+        <text x="200" y="13" fill="#888" font-size="9" font-family="monospace">0:03</text>
+        <text x="280" y="13" fill="#888" font-size="9" font-family="monospace">0:04</text>
+        <text x="360" y="13" fill="#888" font-size="9" font-family="monospace">0:05</text>
+
+        <!-- Ch1 bg -->
+        <rect x="0" y="20" width="420" height="40" fill="#222"/>
+        <!-- Ch1 waveform -->
+        <path d="M0,40 Q20,25 40,40 Q60,55 80,40 Q100,28 120,40 Q140,52 160,40 Q180,26 200,40 Q220,54 240,40 Q260,27 280,40 Q300,53 320,40 Q340,26 360,40 Q380,54 400,40 Q410,35 420,40" stroke="#4a9eff" stroke-width="1.5" fill="none"/>
+
+        <!-- Ch2 bg -->
+        <rect x="0" y="62" width="420" height="40" fill="#222"/>
+        <!-- Ch2 waveform -->
+        <path d="M0,82 Q20,70 40,82 Q60,94 80,82 Q100,71 120,82 Q140,93 160,82 Q180,70 200,82 Q220,94 240,82 Q260,71 280,82 Q300,93 320,82 Q340,70 360,82 Q380,93 400,82 Q410,76 420,82" stroke="#ff6b4a" stroke-width="1.5" fill="none"/>
+
+        <!-- Selection region: translucent blue fill -->
+        <rect x="120" y="18" width="140" height="86" fill="rgba(74,158,255,0.18)" stroke="none"/>
+        <!-- Left handle: bright vertical line -->
+        <rect x="119" y="18" width="2" height="86" fill="rgba(74,158,255,0.9)"/>
+        <!-- Right handle: bright vertical line -->
+        <rect x="259" y="18" width="2" height="86" fill="rgba(74,158,255,0.9)"/>
+        <!-- Top handle grips -->
+        <rect x="113" y="18" width="14" height="8" rx="2" fill="rgba(74,158,255,0.9)"/>
+        <rect x="253" y="18" width="14" height="8" rx="2" fill="rgba(74,158,255,0.9)"/>
+
+        <!-- Playhead cursor -->
+        <rect x="80" y="18" width="2" height="86" fill="#ff3b30"/>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>A — Translucent Blue + Tab Handles</h3>
+      <p>Subtle fill with draggable tab grips at the top edges. Clean, industry-standard feel similar to Logic Pro / Reaper.</p>
+    </div>
+  </div>
+
+  <!-- Option B: High-contrast amber/gold -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;background:#1a1a1a;border-radius:6px;overflow:hidden;">
+      <svg viewBox="0 0 420 110" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;">
+        <!-- Ruler -->
+        <rect x="0" y="0" width="420" height="18" fill="#2a2a2a"/>
+        <text x="40" y="13" fill="#888" font-size="9" font-family="monospace">0:01</text>
+        <text x="120" y="13" fill="#888" font-size="9" font-family="monospace">0:02</text>
+        <text x="200" y="13" fill="#888" font-size="9" font-family="monospace">0:03</text>
+        <text x="280" y="13" fill="#888" font-size="9" font-family="monospace">0:04</text>
+        <text x="360" y="13" fill="#888" font-size="9" font-family="monospace">0:05</text>
+
+        <!-- Ch1 bg -->
+        <rect x="0" y="20" width="420" height="40" fill="#222"/>
+        <path d="M0,40 Q20,25 40,40 Q60,55 80,40 Q100,28 120,40 Q140,52 160,40 Q180,26 200,40 Q220,54 240,40 Q260,27 280,40 Q300,53 320,40 Q340,26 360,40 Q380,54 400,40 Q410,35 420,40" stroke="#4a9eff" stroke-width="1.5" fill="none"/>
+
+        <!-- Ch2 bg -->
+        <rect x="0" y="62" width="420" height="40" fill="#222"/>
+        <path d="M0,82 Q20,70 40,82 Q60,94 80,82 Q100,71 120,82 Q140,93 160,82 Q180,70 200,82 Q220,94 240,82 Q260,71 280,82 Q300,93 320,82 Q340,70 360,82 Q380,93 400,82 Q410,76 420,82" stroke="#ff6b4a" stroke-width="1.5" fill="none"/>
+
+        <!-- Selection region: amber fill -->
+        <rect x="120" y="18" width="140" height="86" fill="rgba(255,196,0,0.15)" stroke="none"/>
+        <!-- Dashed border -->
+        <rect x="120" y="18" width="140" height="86" fill="none" stroke="rgba(255,196,0,0.85)" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <!-- Duration label -->
+        <rect x="143" y="21" width="66" height="14" rx="3" fill="rgba(255,196,0,0.85)"/>
+        <text x="176" y="31" fill="#1a1a1a" font-size="9" font-family="monospace" text-anchor="middle">1.75s</text>
+
+        <!-- Playhead -->
+        <rect x="80" y="18" width="2" height="86" fill="#ff3b30"/>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>B — Amber + Duration Label</h3>
+      <p>Gold/amber tinted fill with dashed border and a floating label showing exact selection duration. Good contrast against colored waveforms.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Dark inverted region with bright border -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:0;background:#1a1a1a;border-radius:6px;overflow:hidden;">
+      <svg viewBox="0 0 420 110" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;">
+        <!-- Ruler -->
+        <rect x="0" y="0" width="420" height="18" fill="#2a2a2a"/>
+        <text x="40" y="13" fill="#888" font-size="9" font-family="monospace">0:01</text>
+        <text x="120" y="13" fill="#888" font-size="9" font-family="monospace">0:02</text>
+        <text x="200" y="13" fill="#888" font-size="9" font-family="monospace">0:03</text>
+        <text x="280" y="13" fill="#888" font-size="9" font-family="monospace">0:04</text>
+        <text x="360" y="13" fill="#888" font-size="9" font-family="monospace">0:05</text>
+
+        <!-- Dimmed outside area (selected is brighter) -->
+        <rect x="0" y="20" width="420" height="40" fill="#222"/>
+        <rect x="0" y="20" width="120" height="40" fill="rgba(0,0,0,0.45)"/>
+        <rect x="260" y="20" width="160" height="40" fill="rgba(0,0,0,0.45)"/>
+        <path d="M0,40 Q20,25 40,40 Q60,55 80,40 Q100,28 120,40 Q140,52 160,40 Q180,26 200,40 Q220,54 240,40 Q260,27 280,40 Q300,53 320,40 Q340,26 360,40 Q380,54 400,40 Q410,35 420,40" stroke="#4a9eff" stroke-width="1.5" fill="none"/>
+
+        <rect x="0" y="62" width="420" height="40" fill="#222"/>
+        <rect x="0" y="62" width="120" height="40" fill="rgba(0,0,0,0.45)"/>
+        <rect x="260" y="62" width="160" height="40" fill="rgba(0,0,0,0.45)"/>
+        <path d="M0,82 Q20,70 40,82 Q60,94 80,82 Q100,71 120,82 Q140,93 160,82 Q180,70 200,82 Q220,94 240,82 Q260,71 280,82 Q300,93 320,82 Q340,70 360,82 Q380,93 400,82 Q410,76 420,82" stroke="#ff6b4a" stroke-width="1.5" fill="none"/>
+
+        <!-- Selection border: white edges only -->
+        <rect x="120" y="18" width="140" height="86" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+        <!-- Edge handles: small squares -->
+        <rect x="116" y="55" width="8" height="14" rx="2" fill="white"/>
+        <rect x="256" y="55" width="8" height="14" rx="2" fill="white"/>
+
+        <!-- Playhead -->
+        <rect x="80" y="18" width="2" height="86" fill="#ff3b30"/>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>C — Dim Outside / Bright Inside</h3>
+      <p>Dims everything outside the selection. The selected region "lights up" by contrast, with white side-handles for dragging edges. Pro Tools / Avid style.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:1.5rem;">Click to select your preferred style — or describe what you'd change.</p>

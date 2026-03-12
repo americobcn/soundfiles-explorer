@@ -1,0 +1,109 @@
+<h2>Interaction State Machine</h2>
+<p class="subtitle">How mouse events flow through region selection, edge-resize, and deselect</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1rem;">
+
+  <!-- State 1: No selection -->
+  <div style="background:#1e1e1e;border-radius:8px;overflow:hidden;">
+    <div style="padding:10px 14px;background:#2a2a2a;font-size:11px;color:#aaa;font-family:monospace;letter-spacing:.04em;">STATE: idle (no selection)</div>
+    <svg viewBox="0 0 320 80" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;">
+      <rect x="0" y="0" width="320" height="80" fill="#1e1e1e"/>
+      <rect x="0" y="0" width="320" height="30" fill="#222"/>
+      <path d="M0,15 Q16,6 32,15 Q48,24 64,15 Q80,6 96,15 Q112,24 128,15 Q144,6 160,15 Q176,24 192,15 Q208,6 224,15 Q240,24 256,15 Q272,6 288,15 Q304,24 320,15" stroke="#4a9eff" stroke-width="1.2" fill="none"/>
+      <rect x="0" y="32" width="320" height="30" fill="#222"/>
+      <path d="M0,47 Q16,38 32,47 Q48,56 64,47 Q80,38 96,47 Q112,56 128,47 Q144,38 160,47 Q176,56 192,47 Q208,38 224,47 Q240,56 256,47 Q272,38 288,47 Q304,56 320,47" stroke="#ff6b4a" stroke-width="1.2" fill="none"/>
+      <rect x="90" y="0" width="2" height="62" fill="#ff3b30" opacity="0.9"/>
+      <!-- cursor crosshair -->
+      <circle cx="190" cy="31" r="5" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.2"/>
+      <line x1="190" y1="27" x2="190" y2="35" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+      <line x1="186" y1="31" x2="194" y2="31" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+      <text x="160" y="74" fill="#666" font-size="9" font-family="monospace">mouseDown → start drag</text>
+    </svg>
+  </div>
+
+  <!-- State 2: Dragging new selection -->
+  <div style="background:#1e1e1e;border-radius:8px;overflow:hidden;">
+    <div style="padding:10px 14px;background:#2a2a2a;font-size:11px;color:#aaa;font-family:monospace;letter-spacing:.04em;">STATE: dragging (new selection)</div>
+    <svg viewBox="0 0 320 80" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;">
+      <rect x="0" y="0" width="320" height="80" fill="#1e1e1e"/>
+      <!-- left dim -->
+      <rect x="0" y="0" width="130" height="62" fill="rgba(0,0,0,0.5)"/>
+      <!-- right dim -->
+      <rect x="230" y="0" width="90" height="62" fill="rgba(0,0,0,0.5)"/>
+      <!-- channels -->
+      <rect x="0" y="0" width="320" height="30" fill="#222" opacity="0.4"/>
+      <path d="M0,15 Q16,6 32,15 Q48,24 64,15 Q80,6 96,15 Q112,24 128,15 Q144,6 160,15 Q176,24 192,15 Q208,6 224,15 Q240,24 256,15 Q272,6 288,15 Q304,24 320,15" stroke="#4a9eff" stroke-width="1.2" fill="none"/>
+      <rect x="0" y="32" width="320" height="30" fill="#222" opacity="0.4"/>
+      <path d="M0,47 Q16,38 32,47 Q48,56 64,47 Q80,38 96,47 Q112,56 128,47 Q144,38 160,47 Q176,56 192,47 Q208,38 224,47 Q240,56 256,47 Q272,38 288,47 Q304,56 320,47" stroke="#ff6b4a" stroke-width="1.2" fill="none"/>
+      <!-- selection region bright border -->
+      <rect x="130" y="0" width="100" height="62" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.2"/>
+      <!-- duration badge -->
+      <rect x="152" y="2" width="52" height="13" rx="3" fill="rgba(255,255,255,0.15)"/>
+      <text x="178" y="12" fill="white" font-size="8" font-family="monospace" text-anchor="middle">1.25s</text>
+      <!-- playhead -->
+      <rect x="90" y="0" width="2" height="62" fill="#ff3b30" opacity="0.9"/>
+      <text x="130" y="74" fill="#666" font-size="9" font-family="monospace">mouseDragged → grow region</text>
+    </svg>
+  </div>
+
+  <!-- State 3: Selection finalized -->
+  <div style="background:#1e1e1e;border-radius:8px;overflow:hidden;">
+    <div style="padding:10px 14px;background:#2a2a2a;font-size:11px;color:#aaa;font-family:monospace;letter-spacing:.04em;">STATE: selected (finalized)</div>
+    <svg viewBox="0 0 320 80" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;">
+      <rect x="0" y="0" width="320" height="80" fill="#1e1e1e"/>
+      <rect x="0" y="0" width="120" height="62" fill="rgba(0,0,0,0.5)"/>
+      <rect x="240" y="0" width="80" height="62" fill="rgba(0,0,0,0.5)"/>
+      <rect x="0" y="0" width="320" height="30" fill="#222" opacity="0.4"/>
+      <path d="M0,15 Q16,6 32,15 Q48,24 64,15 Q80,6 96,15 Q112,24 128,15 Q144,6 160,15 Q176,24 192,15 Q208,6 224,15 Q240,24 256,15 Q272,6 288,15 Q304,24 320,15" stroke="#4a9eff" stroke-width="1.2" fill="none"/>
+      <rect x="0" y="32" width="320" height="30" fill="#222" opacity="0.4"/>
+      <path d="M0,47 Q16,38 32,47 Q48,56 64,47 Q80,38 96,47 Q112,56 128,47 Q144,38 160,47 Q176,56 192,47 Q208,38 224,47 Q240,56 256,47 Q272,38 288,47 Q304,56 320,47" stroke="#ff6b4a" stroke-width="1.2" fill="none"/>
+      <!-- bright selection border -->
+      <rect x="120" y="0" width="120" height="62" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+      <!-- side handles -->
+      <rect x="114" y="22" width="9" height="18" rx="3" fill="rgba(255,255,255,0.85)"/>
+      <rect x="237" y="22" width="9" height="18" rx="3" fill="rgba(255,255,255,0.85)"/>
+      <!-- duration badge -->
+      <rect x="151" y="2" width="56" height="13" rx="3" fill="rgba(255,255,255,0.15)"/>
+      <text x="179" y="12" fill="white" font-size="8" font-family="monospace" text-anchor="middle">1.50s ↕ drag</text>
+      <!-- playhead inside region -->
+      <rect x="150" y="0" width="2" height="62" fill="#ff3b30" opacity="0.9"/>
+      <text x="100" y="74" fill="#666" font-size="9" font-family="monospace">mouseUp → finalize · handle hover = resize cursor</text>
+    </svg>
+  </div>
+
+  <!-- State 4: Edge resize -->
+  <div style="background:#1e1e1e;border-radius:8px;overflow:hidden;">
+    <div style="padding:10px 14px;background:#2a2a2a;font-size:11px;color:#aaa;font-family:monospace;letter-spacing:.04em;">STATE: edge resize (right edge grabbed)</div>
+    <svg viewBox="0 0 320 80" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;">
+      <rect x="0" y="0" width="320" height="80" fill="#1e1e1e"/>
+      <rect x="0" y="0" width="120" height="62" fill="rgba(0,0,0,0.5)"/>
+      <rect x="200" y="0" width="120" height="62" fill="rgba(0,0,0,0.5)"/>
+      <rect x="0" y="0" width="320" height="30" fill="#222" opacity="0.4"/>
+      <path d="M0,15 Q16,6 32,15 Q48,24 64,15 Q80,6 96,15 Q112,24 128,15 Q144,6 160,15 Q176,24 192,15 Q208,6 224,15 Q240,24 256,15 Q272,6 288,15 Q304,24 320,15" stroke="#4a9eff" stroke-width="1.2" fill="none"/>
+      <rect x="0" y="32" width="320" height="30" fill="#222" opacity="0.4"/>
+      <path d="M0,47 Q16,38 32,47 Q48,56 64,47 Q80,38 96,47 Q112,56 128,47 Q144,38 160,47 Q176,56 192,47 Q208,38 224,47 Q240,56 256,47 Q272,38 288,47 Q304,56 320,47" stroke="#ff6b4a" stroke-width="1.2" fill="none"/>
+      <!-- selection with right edge dragging -->
+      <rect x="120" y="0" width="80" height="62" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+      <!-- left handle normal -->
+      <rect x="114" y="22" width="9" height="18" rx="3" fill="rgba(255,255,255,0.85)"/>
+      <!-- right handle highlighted (being dragged) -->
+      <rect x="197" y="18" width="11" height="26" rx="3" fill="white"/>
+      <!-- resize cursor indicator -->
+      <text x="210" y="38" fill="rgba(255,255,255,0.7)" font-size="11" font-family="monospace">↔</text>
+      <!-- duration badge updating -->
+      <rect x="131" y="2" width="52" height="13" rx="3" fill="rgba(255,196,0,0.3)"/>
+      <text x="157" y="12" fill="#ffc400" font-size="8" font-family="monospace" text-anchor="middle">1.00s</text>
+      <!-- playhead -->
+      <rect x="150" y="0" width="2" height="62" fill="#ff3b30" opacity="0.9"/>
+      <text x="80" y="74" fill="#666" font-size="9" font-family="monospace">mouseDragged on edge → resize · badge turns amber</text>
+    </svg>
+  </div>
+
+</div>
+
+<div style="margin-top:1.5rem;padding:1rem;background:#1e1e1e;border-radius:8px;border-left:3px solid rgba(74,158,255,0.6);">
+  <p class="label" style="margin-bottom:.5rem;">Phase 2 — Drag to DAW</p>
+  <p style="font-size:13px;color:#ccc;margin:0;">When a region is finalized: <strong style="color:white">click + drag anywhere inside the selection</strong> → writes a temp WAV slice → initiates NSDraggingSession → drop onto Pro Tools / Finder / any app.</p>
+</div>
+
+<p class="subtitle" style="margin-top:1.5rem;">Does this interaction model look right? Let me know in the terminal.</p>
