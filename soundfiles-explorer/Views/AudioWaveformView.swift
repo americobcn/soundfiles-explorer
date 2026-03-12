@@ -205,7 +205,9 @@ class AudioWaveformView: NSView {
         border.actions = noAnimation
         lHandle.actions = noAnimation
         rHandle.actions = noAnimation
-        badge.actions = noAnimation
+        // Badge also suppresses "string" to prevent cross-fade flicker during live drag updates
+        badge.actions = ["position": NSNull(), "bounds": NSNull(), "frame": NSNull(),
+                         "hidden": NSNull(), "backgroundColor": NSNull(), "string": NSNull()]
     }
     
     
