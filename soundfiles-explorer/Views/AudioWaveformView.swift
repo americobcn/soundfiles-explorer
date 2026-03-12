@@ -66,6 +66,7 @@ class AudioWaveformView: NSView {
     var pixelsPerSecond: CGFloat = 100 {
         didSet {
             needsDisplay = true
+            updateSelectionLayers()
         }
     }
     
@@ -80,9 +81,22 @@ class AudioWaveformView: NSView {
     /// Layer for ruler
     private var rulerLayer: CALayer?
     private var needsRulerUpdate = true
-    
+
+    // MARK: - Selection Layers
+    private var leftDimLayer: CALayer?
+    private var rightDimLayer: CALayer?
+    private var selectionBorderLayer: CALayer?
+    private var leftHandleLayer: CALayer?
+    private var rightHandleLayer: CALayer?
+    private var durationBadgeLayer: CATextLayer?
+
     /// Flag to track if waveform layer needs update
     private var needsWaveformUpdate = true
+
+    /// Currently selected time region. Setting this updates all selection layers.
+    private(set) var selectionRegion: (start: TimeInterval, end: TimeInterval)? {
+        didSet { updateSelectionLayers() }
+    }
 
             
     // MARK: - Initialization
@@ -105,7 +119,7 @@ class AudioWaveformView: NSView {
         waveformLayer = CALayer()
         waveformLayer?.zPosition = 10
         // waveformLayer?.actions = ["position": NSNull(), "bounds": NSNull(), "frame": NSNull()]
-        waveformLayer?.borderColor = NSColor(calibratedWhite: 0.5, alpha: 1.0).cgColor
+        //waveformLayer?.borderColor = NSColor(calibratedWhite: 0.5, alpha: 1.0).cgColor
         waveformLayer?.borderWidth = 1.0
         
         layer?.addSublayer(waveformLayer!)
@@ -123,6 +137,75 @@ class AudioWaveformView: NSView {
         // rulerLayer?.zPosition = 100
         // rulerLayer?.backgroundColor = NSColor.darkGray.cgColor
         // layer?.addSublayer(rulerLayer!)
+
+        // Left dim overlay (outside selection, left side)
+        let leftDim = CALayer()
+        leftDim.zPosition = 20
+        leftDim.backgroundColor = NSColor(calibratedWhite: 0, alpha: 0.5).cgColor
+        leftDim.isHidden = true
+        layer?.addSublayer(leftDim)
+        leftDimLayer = leftDim
+
+        // Right dim overlay (outside selection, right side)
+        let rightDim = CALayer()
+        rightDim.zPosition = 21
+        rightDim.backgroundColor = NSColor(calibratedWhite: 0, alpha: 0.5).cgColor
+        rightDim.isHidden = true
+        layer?.addSublayer(rightDim)
+        rightDimLayer = rightDim
+
+        // Selection border (white outline around selected region)
+        let border = CALayer()
+        border.zPosition = 22
+        border.backgroundColor = NSColor.clear.cgColor
+        border.borderColor = NSColor.white.withAlphaComponent(0.75).cgColor
+        border.borderWidth = 1.5
+        border.isHidden = true
+        layer?.addSublayer(border)
+        selectionBorderLayer = border
+
+        // Left resize handle (pill grip on left edge)
+        let lHandle = CALayer()
+        lHandle.zPosition = 23
+        lHandle.backgroundColor = NSColor.white.withAlphaComponent(0.85).cgColor
+        lHandle.cornerRadius = 3
+        lHandle.isHidden = true
+        layer?.addSublayer(lHandle)
+        leftHandleLayer = lHandle
+
+        // Right resize handle (pill grip on right edge)
+        let rHandle = CALayer()
+        rHandle.zPosition = 24
+        rHandle.backgroundColor = NSColor.white.withAlphaComponent(0.85).cgColor
+        rHandle.cornerRadius = 3
+        rHandle.isHidden = true
+        layer?.addSublayer(rHandle)
+        rightHandleLayer = rHandle
+
+        // Duration badge (text label inside selection)
+        // Note: CATextLayer.font expects CFTypeRef — cast explicitly to avoid runtime warning.
+        let badge = CATextLayer()
+        badge.zPosition = 25
+        badge.fontSize = 10
+        badge.font = NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .medium) as CFTypeRef
+        badge.foregroundColor = NSColor.white.cgColor
+        badge.backgroundColor = NSColor(calibratedWhite: 1, alpha: 0.12).cgColor
+        badge.cornerRadius = 3
+        badge.alignmentMode = .center
+        badge.contentsScale = NSScreen.main?.backingScaleFactor ?? 2.0
+        badge.isHidden = true
+        layer?.addSublayer(badge)
+        durationBadgeLayer = badge
+
+        // Disable implicit animations on all selection layers
+        let noAnimation: [String: CAAction] = ["position": NSNull(), "bounds": NSNull(), "frame": NSNull(),
+                           "hidden": NSNull(), "backgroundColor": NSNull()]
+        leftDim.actions = noAnimation
+        rightDim.actions = noAnimation
+        border.actions = noAnimation
+        lHandle.actions = noAnimation
+        rHandle.actions = noAnimation
+        badge.actions = noAnimation
     }
     
     
@@ -135,6 +218,7 @@ class AudioWaveformView: NSView {
     ///   - sampleRate: The sample rate of the audio file
     ///   - channelCount: The number of audio channels
     func setWaveformData(_ waveformData: [[Float]], duration: TimeInterval, sampleRate: Double, channelCount: Int, names: [Int: String]) {
+        selectionRegion = nil
         self.channelWaveforms = waveformData
         self.duration = duration
         self.sampleRate = sampleRate
@@ -159,6 +243,7 @@ class AudioWaveformView: NSView {
     
     /// Shows loading state when waveform data is not yet available
     func showLoadingState(duration: TimeInterval, sampleRate: Double, channelCount: Int, names: [Int: String]) {
+        selectionRegion = nil
         self.channelWaveforms = []
         self.duration = duration
         self.sampleRate = sampleRate
@@ -179,6 +264,7 @@ class AudioWaveformView: NSView {
     
     /// Clears the waveform view completely
     func clearWaveform() {
+        selectionRegion = nil
         self.channelWaveforms = []
         self.duration = 0
         self.sampleRate = 0
@@ -460,6 +546,60 @@ class AudioWaveformView: NSView {
         needsWaveformUpdate = true
     }
     
+    /// Updates all selection layer frames and visibility. Called whenever selectionRegion changes.
+    /// Never re-renders the waveform bitmap — only repositions layers.
+    private func updateSelectionLayers() {
+        let hidden = selectionRegion == nil
+        leftDimLayer?.isHidden = hidden
+        rightDimLayer?.isHidden = hidden
+        selectionBorderLayer?.isHidden = hidden
+        leftHandleLayer?.isHidden = hidden
+        rightHandleLayer?.isHidden = hidden
+        durationBadgeLayer?.isHidden = hidden
+
+        guard let region = selectionRegion else { return }
+
+        let h = bounds.height
+        let leftX  = CGFloat(region.start) * pixelsPerSecond
+        let rightX = CGFloat(region.end)   * pixelsPerSecond
+
+        // Left dim: from 0 to selection start
+        leftDimLayer?.frame  = CGRect(x: 0,      y: 0, width: leftX,              height: h)
+        // Right dim: from selection end to full content width
+        let totalWidth = getTotalWidth()
+        rightDimLayer?.frame = CGRect(x: rightX, y: 0, width: max(0, totalWidth - rightX), height: h)
+        // Border: exactly over the selection
+        selectionBorderLayer?.frame = CGRect(x: leftX, y: 0, width: rightX - leftX, height: h)
+
+        // Handles: pill shape, vertically centred on each edge
+        let handleW: CGFloat = 9
+        let handleH: CGFloat = 20
+        let handleY = (h - handleH) / 2
+        leftHandleLayer?.frame  = CGRect(x: leftX  - handleW / 2, y: handleY, width: handleW, height: handleH)
+        rightHandleLayer?.frame = CGRect(x: rightX - handleW / 2, y: handleY, width: handleW, height: handleH)
+
+        // Duration badge: centred inside selection, near top
+        let regionDuration = region.end - region.start
+        let durationText = formatTime(regionDuration)
+        let badgeW: CGFloat = 60
+        let badgeH: CGFloat = 16
+        let badgeCenterX = leftX + (rightX - leftX) / 2
+        durationBadgeLayer?.string = durationText
+        durationBadgeLayer?.frame = CGRect(
+            x: badgeCenterX - badgeW / 2,
+            y: 4,
+            width: badgeW,
+            height: badgeH
+        )
+
+        // Post selection-changed notification
+        NotificationCenter.default.post(
+            name: NSNotification.Name("AudioWaveformViewSelectionChanged"),
+            object: self,
+            userInfo: ["start": region.start, "end": region.end]
+        )
+    }
+
     /// Updates cursor layer with current playback position
     private func updateCursorLayer() {
         guard let cursorLayer = cursorLayer else { return }
