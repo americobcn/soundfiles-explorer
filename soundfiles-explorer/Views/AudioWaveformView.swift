@@ -210,6 +210,8 @@ class AudioWaveformView: NSView {
             renderWaveformLayer()            
         }
         
+        // drawTimeRuler()
+        
         // Update cursor layer (always update on draw)
         updateCursorLayer()
     }
@@ -270,7 +272,7 @@ class AudioWaveformView: NSView {
         
         // Get full content dimensions for scrolling
         let fullContentWidth = getTotalWidth()
-        let rulerRect = NSRect(x: 0, y: 0, width: fullContentWidth , height: rulerHeight) //
+        let rulerRect = NSRect(x: 0, y: (layer?.frame.height)!, width: fullContentWidth , height: rulerHeight) //
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
         

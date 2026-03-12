@@ -10,9 +10,6 @@ import AVFoundation
 import AVKit
 
 
-// Import the custom classes
-import Foundation
-
 private enum TableColumnIdentifiers: String, CaseIterable {
     case fileName = "fileName"
     case scene = "scene"
@@ -382,6 +379,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         case .circled:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
+            viewCell.textField!.stringValue = ""
             if audioFile.isMetadataLoading {
                 viewCell.textField!.stringValue = "Loading..."
             } else if let circled = audioFile.ixml?.parsedData["CIRCLED"] {
