@@ -711,13 +711,13 @@ class AudioWaveformView: NSView {
         let edgeHitZone: CGFloat = 8
 
         // Branch 1 & 2: edge resize hit-test (takes priority over everything)
-        if let handles = selectionHandleX() {
+        if let handles = selectionHandleX(), let region = selectionRegion {
             if abs(location.x - handles.left) <= edgeHitZone {
-                dragState = .resizingLeft(originalEnd: selectionRegion!.end)
+                dragState = .resizingLeft(originalEnd: region.end)
                 return
             }
             if abs(location.x - handles.right) <= edgeHitZone {
-                dragState = .resizingRight(originalStart: selectionRegion!.start)
+                dragState = .resizingRight(originalStart: region.start)
                 return
             }
         }
@@ -779,9 +779,11 @@ class AudioWaveformView: NSView {
 
         switch dragState {
         case .draggingNewSelection(let anchorTime):
-            // Discard tiny accidental selections (< 50ms) and treat as a seek click instead.
-            // Use anchorTime (from mouseDown) as the seek target — original press position.
-            if let region = selectionRegion, region.end - region.start < 0.05 {
+            // Treat as seek if: no drag occurred (selectionRegion still nil) OR
+            // the drag was too small (< 50ms). Use anchorTime (from mouseDown) as
+            // the seek target — the original press position, not the release point.
+            let isTinyOrMissing = selectionRegion == nil || selectionRegion!.end - selectionRegion!.start < 0.05
+            if isTinyOrMissing {
                 selectionRegion = nil
                 NotificationCenter.default.post(
                     name: NSNotification.Name("AudioWaveformViewSelectionChanged"),
