@@ -50,6 +50,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     private var audioFiles: [AudioFileInfo] = []
     private var displayedIndices: [Int] = []
     private var filterPredicate: String = ""
+    private var currentFileInfo: AudioFileInfo?
     private var notLoadedFiles: [String] = []
     private let metadataReader = AudioMetadataReader()
     private let audioFileLoader = AudioFileLoader()
@@ -434,7 +435,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             
             Task {
                 let fileInfo = audioFiles[actualIndex]
-                
+                self.currentFileInfo = fileInfo
+
                 // Setup playback immediately (playerItem is created right away)
                 if let playerItem = fileInfo.playerItem {
                     // Update waveform view with data (may be nil if still loading)
@@ -463,6 +465,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             }
         } else {
             // Clear everything when no file is selected (e.g., all files removed)
+            currentFileInfo = nil
             if audioPlaybackManager.isPlaying {
                 audioPlaybackManager.stop()
             }
@@ -823,6 +826,13 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             name: NSNotification.Name("FileMetadataLoaded"),
             object: nil
         )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(waveformViewWillBeginDrag(_:)),
+            name: NSNotification.Name("AudioWaveformViewWillBeginDrag"),
+            object: waveformView
+        )
     }
     
     @objc private func fileMetadataLoaded(_ notification: Notification) {
@@ -869,6 +879,21 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         }
     }
     
+    @objc private func waveformViewWillBeginDrag(_ notification: Notification) {
+        guard let event       = notification.userInfo?["event"]       as? NSEvent,
+              let regionStart = notification.userInfo?["regionStart"] as? TimeInterval,
+              let regionEnd   = notification.userInfo?["regionEnd"]   as? TimeInterval,
+              let fileInfo    = currentFileInfo else { return }
+
+        let exporter = AudioRegionExporter()
+        do {
+            let exportedURL = try exporter.exportRegion(from: fileInfo, startTime: regionStart, endTime: regionEnd)
+            waveformView.beginSelectionDrag(fileURL: exportedURL, anchorEvent: event)
+        } catch {
+            print("AudioRegionExporter error: \(error.localizedDescription)")
+        }
+    }
+
     @objc private func waveformViewDidSeek(_ notification: Notification) {
         guard let time = (notification.userInfo?["time"] as? TimeInterval) else { return }
         audioPlaybackManager.seek(to: time)

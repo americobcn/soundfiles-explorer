@@ -681,6 +681,7 @@ class AudioWaveformView: NSView {
         case draggingNewSelection(anchorTime: TimeInterval)
         case resizingLeft(originalEnd: TimeInterval)
         case resizingRight(originalStart: TimeInterval)
+        case potentialDragFromSelection(anchorEvent: NSEvent, regionStart: TimeInterval, regionEnd: TimeInterval)
     }
 
     private var dragState: DragState = .idle
@@ -716,16 +717,10 @@ class AudioWaveformView: NSView {
             }
         }
 
-        // Branch 3: click inside existing selection → deselect, no seek
+        // Branch 3: click inside existing selection → potential drag; deselect only on mouseUp without drag
         if let region = selectionRegion,
            clickedTime >= region.start && clickedTime <= region.end {
-            selectionRegion = nil
-            dragState = .idle
-            NotificationCenter.default.post(
-                name: NSNotification.Name("AudioWaveformViewSelectionChanged"),
-                object: self,
-                userInfo: nil
-            )
+            dragState = .potentialDragFromSelection(anchorEvent: event, regionStart: region.start, regionEnd: region.end)
             return
         }
 
@@ -759,6 +754,18 @@ class AudioWaveformView: NSView {
                 dragState = .resizingLeft(originalEnd: originalStart)
             }
             durationBadgeLayer?.backgroundColor = NSColor(calibratedRed: 1, green: 0.77, blue: 0, alpha: 0.35).cgColor
+
+        case .potentialDragFromSelection(let anchorEvent, let regionStart, let regionEnd):
+            let anchorLocation = convert(anchorEvent.locationInWindow, from: nil)
+            let distance = hypot(location.x - anchorLocation.x, location.y - anchorLocation.y)
+            if distance >= 4.0 {
+                dragState = .idle
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("AudioWaveformViewWillBeginDrag"),
+                    object: self,
+                    userInfo: ["event": anchorEvent, "regionStart": regionStart, "regionEnd": regionEnd]
+                )
+            }
 
         case .idle:
             break
@@ -811,6 +818,15 @@ class AudioWaveformView: NSView {
             }
             break
 
+        case .potentialDragFromSelection:
+            // User clicked inside selection without dragging → deselect
+            selectionRegion = nil
+            NotificationCenter.default.post(
+                name: NSNotification.Name("AudioWaveformViewSelectionChanged"),
+                object: self,
+                userInfo: nil
+            )
+
         case .idle:
             // mouseDown always transitions out of .idle, so this is unreachable in normal usage.
             break
@@ -852,6 +868,88 @@ class AudioWaveformView: NSView {
         } else {
             NSCursor.arrow.set()
         }
+    }
+}
+
+
+// MARK: - Drag Source (NSDraggingSource)
+
+extension AudioWaveformView: NSDraggingSource {
+
+    func draggingSession(_ session: NSDraggingSession,
+                         sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+        return .copy
+    }
+
+    /// Initiates an NSDraggingSession with the exported region file. Must be called
+    /// synchronously from within the original mouse-event call stack.
+    func beginSelectionDrag(fileURL: URL, anchorEvent: NSEvent) {
+        let draggingItem = NSDraggingItem(pasteboardWriter: fileURL as NSURL)
+        let thumbSize = NSSize(width: 220, height: 44)
+        let thumbRect = NSRect(
+            x: bounds.midX - thumbSize.width / 2,
+            y: bounds.midY - thumbSize.height / 2,
+            width: thumbSize.width,
+            height: thumbSize.height
+        )
+        draggingItem.draggingFrame = thumbRect
+        let thumbnail = renderDragThumbnail()
+        draggingItem.imageComponentsProvider = {
+            let component = NSDraggingImageComponent(key: .icon)
+            component.contents = thumbnail
+            component.frame = NSRect(origin: .zero, size: thumbSize)
+            return [component]
+        }
+        beginDraggingSession(with: [draggingItem], event: anchorEvent, source: self)
+    }
+
+    private func renderDragThumbnail() -> NSImage {
+        let size = NSSize(width: 220, height: 44)
+        let image = NSImage(size: size)
+        image.lockFocus()
+
+        NSColor.controlAccentColor.withAlphaComponent(0.15).setFill()
+        NSRect(origin: .zero, size: size).fill()
+
+        guard let region = selectionRegion, !channelWaveforms.isEmpty, duration > 0 else {
+            image.unlockFocus()
+            return image
+        }
+
+        let startFraction = region.start / duration
+        let endFraction   = region.end   / duration
+        let channelCount  = channelWaveforms.count
+        let channelH      = size.height / CGFloat(channelCount)
+
+        for (index, waveform) in channelWaveforms.enumerated() {
+            let startIdx = Int(startFraction * Double(waveform.count))
+            let endIdx   = min(Int(endFraction * Double(waveform.count)), waveform.count)
+            guard startIdx < endIdx else { continue }
+            let slice = Array(waveform[startIdx..<endIdx])
+
+            let rect   = NSRect(x: 0, y: CGFloat(index) * channelH, width: size.width, height: channelH)
+            let midY   = rect.midY
+            let maxAmp = channelH / 2 - 2
+
+            let path = NSBezierPath()
+            for (i, sample) in slice.enumerated() {
+                let x   = rect.minX + CGFloat(i) * (rect.width / CGFloat(slice.count))
+                let amp = CGFloat(sample) * maxAmp
+                if i == 0 { path.move(to: NSPoint(x: x, y: midY - amp)) }
+                else       { path.line(to: NSPoint(x: x, y: midY - amp)) }
+            }
+            for i in stride(from: slice.count - 1, through: 0, by: -1) {
+                let x   = rect.minX + CGFloat(i) * (rect.width / CGFloat(slice.count))
+                let amp = CGFloat(slice[i]) * maxAmp
+                path.line(to: NSPoint(x: x, y: midY + amp))
+            }
+            path.close()
+            waveformColors[index % waveformColors.count].setFill()
+            path.fill()
+        }
+
+        image.unlockFocus()
+        return image
     }
 }
 
