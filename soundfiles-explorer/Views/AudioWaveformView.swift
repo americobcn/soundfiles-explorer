@@ -93,6 +93,9 @@ class AudioWaveformView: NSView {
     /// Flag to track if waveform layer needs update
     private var needsWaveformUpdate = true
 
+    /// Frame at which the waveform bitmap was last rendered. Used to detect stale renders.
+    private var lastRenderedLayerFrame: CGRect = .zero
+
     /// Currently selected time region. Setting this updates all selection layers.
     private(set) var selectionRegion: (start: TimeInterval, end: TimeInterval)? {
         didSet { updateSelectionLayers() }
@@ -113,14 +116,16 @@ class AudioWaveformView: NSView {
     private func setupView() {
         wantsLayer = true
         translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .horizontal)
+        setContentCompressionResistancePriority(.required, for: .horizontal)
         layer?.zPosition = 1
         
         // Create waveform layer for static content
         waveformLayer = CALayer()
         waveformLayer?.zPosition = 10
-        // waveformLayer?.actions = ["position": NSNull(), "bounds": NSNull(), "frame": NSNull()]
+        waveformLayer?.actions = ["position": NSNull(), "bounds": NSNull(), "contents": NSNull()]
         //waveformLayer?.borderColor = NSColor(calibratedWhite: 0.5, alpha: 1.0).cgColor
-        waveformLayer?.borderWidth = 1.0
+        waveformLayer?.borderWidth = 1.0	
         
         layer?.addSublayer(waveformLayer!)
         
@@ -287,15 +292,21 @@ class AudioWaveformView: NSView {
         super.draw(dirtyRect)
         
         // Always ensure waveformLayer frame is correct for scrolling
-        if let waveformLayer = waveformLayer {
-            let fullContentWidth = getTotalWidth()
-            let fullContentHeight = intrinsicContentSize.height
-            waveformLayer.frame = NSRect(x: 0, y: 0, width: fullContentWidth, height: max(fullContentHeight, bounds.height))
+        let fullContentWidth = getTotalWidth()
+        let fullContentHeight = intrinsicContentSize.height
+        let expectedFrame = CGRect(x: 0, y: 0,
+                                   width: fullContentWidth,
+                                   height: fullContentHeight)
+
+        waveformLayer?.frame = expectedFrame
+
+        // Re-render if the frame changed since last render (e.g. after layout or zoom)
+        if !needsWaveformUpdate && expectedFrame != lastRenderedLayerFrame {
+            needsWaveformUpdate = true
         }
-        
-        // Render waveform layer if needed
+
         if needsWaveformUpdate {
-            renderWaveformLayer()            
+            renderWaveformLayer()
         }
         
         // drawTimeRuler()
@@ -479,12 +490,12 @@ class AudioWaveformView: NSView {
         let fullContentHeight = intrinsicContentSize.height
         
         // Update layer frame to cover full scrollable content
-        waveformLayer.frame = NSRect(x: 0, y: 0, width: fullContentWidth, height: max(fullContentHeight, bounds.height))
+        waveformLayer.frame = NSRect(x: 0, y: 0, width: fullContentWidth, height: fullContentHeight)
         waveformLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 1.0
-        
+
         // Create bitmap context for rendering full content width
         let width = Int(fullContentWidth)
-        let height = Int(max(fullContentHeight, bounds.height))
+        let height = Int(fullContentHeight)
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
                         
@@ -521,12 +532,9 @@ class AudioWaveformView: NSView {
             return
         }
         
-        // Calculate starting Y to attach channels to top when content fits
-        let startY = max(0, CGFloat(height) - fullContentHeight)
-        
         // Draw each channel across full width
         for (index, waveform) in channelWaveforms.enumerated() {
-            let yPosition = startY  + CGFloat(index) * (channelHeight + channelSpacing)
+            let yPosition = CGFloat(index) * (channelHeight + channelSpacing)
             let channelRect = NSRect(x: 0, y: yPosition, width: fullContentWidth, height: channelHeight)
             
             // Draw channel background
@@ -545,6 +553,9 @@ class AudioWaveformView: NSView {
             waveformLayer.contents = cgImage
         }
         
+        lastRenderedLayerFrame = waveformLayer.frame
+        
+        //Setting needsWaveformUpdate to false here break zoom and auto scroll wavefrorm view
         needsWaveformUpdate = false
     }
     
@@ -607,9 +618,9 @@ class AudioWaveformView: NSView {
         cursorLayer.contentsScale = NSScreen.main?.backingScaleFactor ?? 1.0
         let x = CGFloat(currentTime) * pixelsPerSecond
         
-        // Only draw if cursor is visible
-        if x >= 0 && x <= bounds.width {
-            // Position cursor layer at cursor location
+        // Only draw if cursor is within the content area
+        let totalWidth = getTotalWidth()
+        if x >= 0 && x <= totalWidth {
             cursorLayer.frame = NSRect(x: x, y: 0, width: 2.0, height: bounds.height)
         }
     }
@@ -973,6 +984,7 @@ extension AudioWaveformView {
     /// Call this when zoom changes to update the scroll view
     func updateContentSize() {
         invalidateIntrinsicContentSize()
+        enclosingScrollView?.layoutSubtreeIfNeeded()
         needsDisplay = true
     }
     
@@ -1003,31 +1015,3 @@ private extension Comparable {
         Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }
-
-
-
-
-
-
-
-
-
-/*************************************************/
-/**     UNUSED                                  **/
-/*************************************************/
-/*
- private func drawChannelLabel(_ label: String, at point: NSPoint, in context: CGContext) {
-     let attributes: [NSAttributedString.Key: Any] = [
-         .font: NSFont.systemFont(ofSize: 11, weight: .medium),
-         .foregroundColor: textColor
-     ]
-     
-     let attributedString = NSAttributedString(string: label, attributes: attributes)
-     let size = attributedString.size()
-     attributedString.draw(at: NSPoint(x: point.x  , y: point.y - size.height / 2))
- }
- 
- 
- 
- 
-*/

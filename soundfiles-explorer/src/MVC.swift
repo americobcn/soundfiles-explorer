@@ -56,8 +56,9 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     private let audioFileLoader = AudioFileLoader()
     private var timeLabel: NSTextField!
     private var channelLabelWidth: CGFloat = 80
-    
-    
+    private var keyEventMonitor: Any?
+
+
     // MARK: - Init
     required init?(coder: NSCoder) {
         super.init(coder: coder)
@@ -69,6 +70,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         displayLink?.invalidate()
         removeObserver(self, forKeyPath: "AudioWaveformViewDidSeek")
         removeObserver(self, forKeyPath: "AudioPlaybackStateChanged")
+        if let keyEventMonitor { NSEvent.removeMonitor(keyEventMonitor) }
     }
     
     
@@ -199,9 +201,9 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                                         
         waveformView = AudioWaveformView()
         
-        scrollView.documentView?.translatesAutoresizingMaskIntoConstraints = false
         scrollView.documentView = waveformView
-                        
+        
+        
         // Setup channel labels container
         channelLabelsContainer = NSStackView()
         channelLabelsContainer.wantsLayer = true
@@ -609,15 +611,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         case 36: // Return
             stopAndGoStartEnd(event.modifierFlags)
             break
-        /// Zoom
-        case 15: // R
-            zoomSlider.doubleValue = zoomSlider.doubleValue * 0.75
-            waveformView.setZoomLevel(zoomSlider.doubleValue)
-            break
-        case 17: // T
-            zoomSlider.doubleValue = zoomSlider.doubleValue * 1.25
-            waveformView.setZoomLevel(zoomSlider.doubleValue)
-            break
         case 123: // Left arrow
             let jumpAmount: TimeInterval = isShiftPressed ? 10 : (isCommandPressed ? 1 : 0.1)
             let currentTime = audioPlaybackManager.getCurrentTimeDirect()
@@ -637,14 +630,34 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     
     
     @objc private func playPause() {
-        // AVAudioPlayer
         if audioPlaybackManager.isPlaying {
             audioPlaybackManager.pause()
             playPauseButton.title = "▶ Play"
         } else {
+            if let region = waveformView.selectionRegion {
+                let ct = waveformView.currentTime
+                if ct <= region.start || ct >= region.end {
+                    audioPlaybackManager.seek(to: region.start)
+                    waveformView.currentTime = region.start
+                }
+            }
             audioPlaybackManager.play()
             playPauseButton.title = "⏸ Pause"
         }
+    }
+
+    @objc private func selectionChanged(_ notification: Notification) {
+        guard let start = notification.userInfo?["start"] as? TimeInterval else { return }
+
+        if audioPlaybackManager.isPlaying {
+            audioPlaybackManager.pause()
+            playPauseButton.title = "▶ Play"
+        }
+
+        audioPlaybackManager.seek(to: start)
+        waveformView.currentTime = start
+        updateTimeLabel(start)
+        scrollToFollowPlayback(start)
     }
     
     
@@ -671,6 +684,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         scrollView.contentView.scroll(to: NSPoint(x: newX * 0.8, y: visibleRect.minY))
         scrollView.reflectScrolledClipView(scrollView.contentView)
         updateTimeLabel(destTime)
+        waveformView.invalidateWaveformLayer()
         // Note: Don't call updatePlaybackPosition() here - it would overwrite
         // waveformView.currentTime with the player's current time before the seek completes.
         // The displayLink will update the position once the seek finishes.
@@ -775,6 +789,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             let newX = max(0, cursorX - visibleRect.width / 12)
             scrollView.contentView.scroll(to: NSPoint(x: newX, y: visibleRect.minY))
             scrollView.reflectScrolledClipView(scrollView.contentView)
+            waveformView.invalidateWaveformLayer()
         }
     }
     
@@ -833,6 +848,29 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             name: NSNotification.Name("AudioWaveformViewWillBeginDrag"),
             object: waveformView
         )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(selectionChanged(_:)),
+            name: NSNotification.Name("AudioWaveformViewSelectionChanged"),
+            object: waveformView
+        )
+
+        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            guard event.keyCode == 15 || event.keyCode == 17 else { return event }
+            // Don't intercept while the user is typing in the search field
+            if self.view.window?.firstResponder is NSText { return event }
+            if event.keyCode == 15 { // R — zoom out
+                self.zoomSlider.doubleValue *= 0.75
+            } else {                  // T — zoom in
+                self.zoomSlider.doubleValue *= 1.25
+            }
+            print("Zoom slider value: \(self.zoomSlider.doubleValue)")
+            self.waveformView.setZoomLevel(CGFloat(self.zoomSlider.doubleValue))
+            self.waveformView.updateContentSize()
+            return nil // consume event — NSTableView never sees it
+        }
     }
     
     @objc private func fileMetadataLoaded(_ notification: Notification) {
