@@ -407,7 +407,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         case .audioDescription:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = audioFile.isMetadataLoading ? "Loading..." : "\(audioFile.bitDepth)b \(audioFile.sampleRate)Hz"
+            viewCell.textField!.stringValue = audioFile.isMetadataLoading ? "Loading..." : "\(audioFile.bext?.codingHistory ?? "")"
             return viewCell
         case .duration:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView

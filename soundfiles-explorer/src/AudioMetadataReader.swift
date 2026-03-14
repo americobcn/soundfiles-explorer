@@ -58,24 +58,24 @@ public struct IXMLMetadata {
     public let parsedData: [String: String]
     
     // Common iXML fields
-    public var project: String? { parsedData["PROJECT"] }
-    public var scene: String? { parsedData["SCENE"] }
-    public var take: String? { parsedData["TAKE"] }
-    public var tape: String? { parsedData["TAPE"] }
-    public var circled: String? { parsedData["CIRCLED"] }
-    public var wild: String? { parsedData["WILD_TRACK"] }
-    public var sampleRate: String? { parsedData["SAMPLE_RATE"] }
-    public var audioChannels: String? { parsedData["AUDIO_CHANNELS"] }
-    public var fileLength: String? { parsedData["FILE_LENGTH"] }
-    public var timecodeRate: String? { parsedData["TIMECODE_RATE"] }
-    public var timecodeFlag: String? { parsedData["TIMECODE_FLAG"] }
-    public var fileUID: String? { parsedData["FILE_UID"] }
-    public var note: String? { parsedData["NOTE"] }
-    
+    public nonisolated var project: String? { parsedData["PROJECT"] }
+    public nonisolated var scene: String? { parsedData["SCENE"] }
+    public nonisolated var take: String? { parsedData["TAKE"] }
+    public nonisolated var tape: String? { parsedData["TAPE"] }
+    public nonisolated var circled: String? { parsedData["CIRCLED"] }
+    public nonisolated var wild: String? { parsedData["WILD_TRACK"] }
+    public nonisolated var sampleRate: String? { parsedData["SAMPLE_RATE"] }
+    public nonisolated var audioChannels: String? { parsedData["AUDIO_CHANNELS"] }
+    public nonisolated var fileLength: String? { parsedData["FILE_LENGTH"] }
+    public nonisolated var timecodeRate: String? { parsedData["TIMECODE_RATE"] }
+    public nonisolated var timecodeFlag: String? { parsedData["TIMECODE_FLAG"] }
+    public nonisolated var fileUID: String? { parsedData["FILE_UID"] }
+    public nonisolated var note: String? { parsedData["NOTE"] }
+
     // Track-specific data
-    public var tracks: [IXMLTrack] { extractTracks() }
-    
-    private func extractTracks() -> [IXMLTrack] {
+    public nonisolated var tracks: [IXMLTrack] { extractTracks() }
+
+    private nonisolated func extractTracks() -> [IXMLTrack] {
         var tracks: [IXMLTrack] = []
         var trackIndex = 1
         
@@ -221,7 +221,7 @@ final class AudioMetadataReader {
 
     // MARK: - Main Reading Function
     
-    public func readAudioMetadata(from url: URL) throws -> AudioMetadata {
+    public nonisolated func readAudioMetadata(from url: URL) throws -> AudioMetadata {
         let data = try Data(contentsOf: url, options: .mappedIfSafe)
 
         guard data.count > 12 else {
@@ -272,7 +272,7 @@ final class AudioMetadataReader {
 
     // MARK: - BEXT Chunk Parser
     
-    private func parseBEXTChunk(_ data: Data, offset: Int, size: Int) -> BEXTMetadata? {
+    private nonisolated func parseBEXTChunk(_ data: Data, offset: Int, size: Int) -> BEXTMetadata? {
         guard size >= 602 else { return nil } // Minimum size for bext v1
 
         let description     = data.readCString(at: offset, length: 256)
@@ -330,7 +330,7 @@ final class AudioMetadataReader {
 
     // MARK: - iXML Chunk Parser
     
-    private func parseIXMLChunk(_ data: Data, offset: Int, size: Int) -> IXMLMetadata? {
+    private nonisolated func parseIXMLChunk(_ data: Data, offset: Int, size: Int) -> IXMLMetadata? {
         let xmlData = data.subdata(in: offset ..< offset + size)
         guard let xmlString = String(data: xmlData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) else {
             return nil
@@ -341,7 +341,7 @@ final class AudioMetadataReader {
         return IXMLMetadata(rawXML: xmlString, parsedData: parsedData)
     }
     
-    private func parseIXMLString(_ xml: String) -> [String: String] {
+    private nonisolated func parseIXMLString(_ xml: String) -> [String: String] {
         var result: [String: String] = [:]
         
         // Simple XML parser for iXML data
@@ -373,7 +373,7 @@ final class AudioMetadataReader {
         return result
     }
     
-    private func parseTrackInfo(xml: String, into result: inout [String: String]) {
+    private nonisolated func parseTrackInfo(xml: String, into result: inout [String: String]) {
         // Look for TRACK_LIST and individual TRACK elements
         let trackPattern = "<TRACK>.*?</TRACK>"
         guard let trackRegex = try? NSRegularExpression(pattern: trackPattern, options: .dotMatchesLineSeparators) else {
@@ -403,7 +403,7 @@ final class AudioMetadataReader {
         }
     }
     
-    private func extractValue(from xml: String, tag: String) -> String? {
+    private nonisolated func extractValue(from xml: String, tag: String) -> String? {
         let pattern = "<\(tag)>([^<]*)</\(tag)>"
         guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
             return nil
@@ -424,14 +424,14 @@ final class AudioMetadataReader {
 
 private extension Data {
 
-    func readUInt16LE(at offset: Int) -> UInt16 {
+    nonisolated func readUInt16LE(at offset: Int) -> UInt16 {
         guard offset + 2 <= count else { return 0 }
         let byte0 = UInt16(self[offset])
         let byte1 = UInt16(self[offset + 1])
         return byte0 | (byte1 << 8)
     }
 
-    func readUInt32LE(at offset: Int) -> UInt32 {
+    nonisolated func readUInt32LE(at offset: Int) -> UInt32 {
         guard offset + 4 <= count else { return 0 }
         let byte0 = UInt32(self[offset])
         let byte1 = UInt32(self[offset + 1])
@@ -439,8 +439,8 @@ private extension Data {
         let byte3 = UInt32(self[offset + 3])
         return byte0 | (byte1 << 8) | (byte2 << 16) | (byte3 << 24)
     }
-    
-    func readInt16LE(at offset: Int) -> Int16 {
+
+    nonisolated func readInt16LE(at offset: Int) -> Int16 {
         guard offset + 2 <= count else { return Int16.min }
         let byte0 = UInt16(self[offset])
         let byte1 = UInt16(self[offset + 1])
@@ -448,13 +448,13 @@ private extension Data {
         return Int16(bitPattern: unsigned)
     }
 
-    func readString(at offset: Int, length: Int) -> String {
+    nonisolated func readString(at offset: Int, length: Int) -> String {
         guard offset + length <= count else { return "" }
         let sub = subdata(in: offset ..< offset + length)
         return String(decoding: sub, as: UTF8.self)
     }
 
-    func readCString(at offset: Int, length: Int) -> String {
+    nonisolated func readCString(at offset: Int, length: Int) -> String {
         guard offset + length <= count else { return "" }
         let sub = subdata(in: offset ..< offset + length)
         if let zeroIndex = sub.firstIndex(of: 0) {
@@ -462,8 +462,8 @@ private extension Data {
         }
         return String(decoding: sub, as: UTF8.self).trimmingCharacters(in: .whitespaces)
     }
-    
-    func readHexString(at offset: Int, length: Int) -> String {
+
+    nonisolated func readHexString(at offset: Int, length: Int) -> String {
         guard offset + length <= count else { return "" }
         let sub = subdata(in: offset ..< offset + length)
         return sub.map { String(format: "%02X", $0) }.joined()

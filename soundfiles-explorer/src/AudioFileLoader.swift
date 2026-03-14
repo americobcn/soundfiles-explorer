@@ -48,12 +48,12 @@ final class AudioFileLoader {
     
     // MARK: - Properties
     
-    private let waveformCache: NSCache<NSString, WaveformCacheEntry>
+    nonisolated(unsafe) private let waveformCache: NSCache<NSString, WaveformCacheEntry>
     private let diskCache = WaveformDiskCache()
 
     private class WaveformCacheEntry: NSObject {
-        let waveforms: [[Float]]
-        init(waveforms: [[Float]]) {
+        nonisolated let waveforms: [[Float]]
+        nonisolated init(waveforms: [[Float]]) {
             self.waveforms = waveforms
             super.init()
         }
@@ -75,13 +75,12 @@ final class AudioFileLoader {
     /// This returns synchronously and immediately
     /// - Parameter url: The URL of the audio file
     /// - Returns: AudioFileInfo with minimal info (just filename and URL)
-    func createFileInfo(url: URL) -> AudioFileInfo {
+    func createFileInfo(url: URL)  -> AudioFileInfo {
         let fileInfo = AudioFileInfo(url: url)
         
         // Create playerItem IMMEDIATELY for playback (doesn't need metadata)
         let asset = AVURLAsset(url: url)
         fileInfo.playerItem = AVPlayerItem(asset: asset)
-        
         return fileInfo
     }
     
@@ -95,55 +94,64 @@ final class AudioFileLoader {
     // MARK: - Private Methods
     
     /// Loads all file metadata and waveforms in the background
-    /// Uses @concurrent to force execution on background thread
-    // @concurrent
     private nonisolated func loadFileMetadataAndWaveforms(fileInfo: AudioFileInfo) async {
         do {
-            // With @concurrent, this blocking call runs on background thread
-            // Load audio file for basic info
             let audioFile = try AVAudioFile(forReading: fileInfo.url)
             let format = audioFile.processingFormat
-            
-            // Extract basic info from AVAudioFile
-            fileInfo.sampleRate = format.sampleRate
-            fileInfo.channelCount = Int(format.channelCount)
-            fileInfo.duration = Double(audioFile.length) / fileInfo.sampleRate
-            
-            // Extract ASBD synchronously from processingFormat — no async calls, no main thread involvement
+            let sampleRate = format.sampleRate
+            let channelCount = Int(format.channelCount)
+            let duration = Double(audioFile.length) / sampleRate
             let asbd = format.streamDescription.pointee
-            fileInfo.asbd = asbd
-            fileInfo.bitDepth = Int(asbd.mBitsPerChannel)
-            
-            // Load audio metadata
-            if let audioMetadata = try audioMetadataReader?.readAudioMetadata(from: fileInfo.url) {
-                fileInfo.bext = audioMetadata.bext
-                fileInfo.ixml = audioMetadata.ixml
-                
-                if let ixml = audioMetadata.ixml, let bext = audioMetadata.bext {
-                    fileInfo.date = bext.originationDate
-                    fileInfo.scene = ixml.scene ?? ""
-                    fileInfo.take = ixml.take ?? ""
-                    
-                    let tcr = ixml.parsedData["TIMECODE_RATE"]!.split(separator: "/")
-                    if !tcr.isEmpty {
-                        fileInfo.timeCodeStart = timecodeFromTimeReference(
-                            samples: Int64(bext.timeReferenceSamples),
-                            sampleRate: Double(fileInfo.sampleRate),
-                            frameRate: Double(tcr[0])!
-                        )
-                    }
-                    
-                    // Get tracks index and names
-                    for t in ixml.tracks.enumerated() {
-                        fileInfo.tracksNames[t.element.index] = t.element.name
-                    }
-                }
+            let bitDepth = Int(asbd.mBitsPerChannel)
+
+            await MainActor.run {
+                fileInfo.sampleRate = sampleRate
+                fileInfo.channelCount = channelCount
+                fileInfo.duration = duration
+                fileInfo.asbd = asbd
+                fileInfo.bitDepth = bitDepth
+            }
+
+            guard let audioMetadata = try audioMetadataReader?.readAudioMetadata(from: fileInfo.url) else {
+                await MainActor.run { fileInfo.isMetadataLoading = false }
+                return
+            }
+
+            // Compute all derived values locally (nonisolated, background)
+            let bext = audioMetadata.bext
+            let ixml = audioMetadata.ixml
+            let date = bext?.originationDate ?? ""
+            let scene = ixml?.scene ?? ""
+            let take = ixml?.take ?? ""
+            var tracksNames: [Int: String] = [:]
+            for t in ixml?.tracks ?? [] {
+                if let name = t.name { tracksNames[t.index] = name }
+            }
+
+            var timeCodeStart = ""
+            if let tcr = ixml?.parsedData["TIMECODE_RATE"]?.split(separator: "/"),
+               !tcr.isEmpty,
+               let rate = Double(tcr[0]),
+               let samples = bext.map({ Int64($0.timeReferenceSamples) }) {
+                timeCodeStart = timecodeFromTimeReference(samples: samples,
+                                                          sampleRate: sampleRate,
+                                                          frameRate: rate)
             }
             
-            // Mark metadata loading complete
-            fileInfo.isMetadataLoading = false
+            let trNames = tracksNames
+            let tcrCodeStart = timeCodeStart
             
-            // Post notification that metadata is loaded
+            await MainActor.run {
+                fileInfo.bext = bext
+                fileInfo.ixml = ixml
+                fileInfo.date = date
+                fileInfo.scene = scene
+                fileInfo.take = take
+                fileInfo.tracksNames = trNames
+                fileInfo.timeCodeStart = tcrCodeStart
+                fileInfo.isMetadataLoading = false
+            }
+
             await MainActor.run {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("FileMetadataLoaded"),
@@ -151,29 +159,31 @@ final class AudioFileLoader {
                     userInfo: ["url": fileInfo.url]
                 )
             }
-            
+
             // Start waveform generation in a SEPARATE parallel task
             // This allows metadata to display immediately while waveforms generate in background
             Task.detached { [self] in
                 await self.generateWaveformsInBackground(audioFile: audioFile, fileInfo: fileInfo)
             }
-            
+
         } catch {
             print("Error loading file metadata for \(fileInfo.url.lastPathComponent): \(error)")
-            fileInfo.isMetadataLoading = false
-            fileInfo.isWaveformLoading = false
+            await MainActor.run {
+                fileInfo.isMetadataLoading = false
+                fileInfo.isWaveformLoading = false
+            }
         }
     }
     
     /// Generates waveforms in a separate background task
     private nonisolated func generateWaveformsInBackground(audioFile: AVAudioFile, fileInfo: AudioFileInfo) async {
         do {
-            fileInfo.isWaveformLoading = true
+            await MainActor.run { fileInfo.isWaveformLoading = true }
             let waveformData = try await generateWaveforms(from: audioFile, url: fileInfo.url)
-            fileInfo.waveformData = waveformData
-            fileInfo.isWaveformLoading = false
-            
-            // Post notification that waveforms are ready
+            await MainActor.run {
+                fileInfo.waveformData = waveformData
+                fileInfo.isWaveformLoading = false
+            }
             await MainActor.run {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("WaveformGenerationCompleted"),
@@ -183,7 +193,7 @@ final class AudioFileLoader {
             }
         } catch {
             print("Error generating waveforms for \(fileInfo.url.lastPathComponent): \(error)")
-            fileInfo.isWaveformLoading = false
+            await MainActor.run { fileInfo.isWaveformLoading = false }
         }
     }
     
@@ -270,7 +280,7 @@ final class AudioFileLoader {
     }
     
     
-    func timecodeFromTimeReference(samples: Int64, sampleRate: Double, frameRate: Double) -> String {
+    nonisolated func timecodeFromTimeReference(samples: Int64, sampleRate: Double, frameRate: Double) -> String {
         // Convert samples to seconds
         let seconds = Double(samples) / sampleRate
 
@@ -299,7 +309,7 @@ final class AudioFileLoader {
 ///   Bytes 12+:   Float32 values, channel 0 first, then channel 1, etc.
 private final class WaveformDiskCache {
 
-    private static let magic: [UInt8] = [0x57, 0x46, 0x43, 0x58] // "WFCX"
+    nonisolated private static let magic: [UInt8] = [0x57, 0x46, 0x43, 0x58] // "WFCX"
     private let cacheDirectory: URL
 
     init() {
