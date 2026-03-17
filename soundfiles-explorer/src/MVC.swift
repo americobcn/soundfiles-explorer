@@ -407,7 +407,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         case .audioDescription:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = audioFile.isMetadataLoading ? "Loading..." : "\(audioFile.bext?.codingHistory ?? "")"
+            viewCell.textField!.stringValue = audioFile.isMetadataLoading ? "Loading..." : "\(audioFile.bitDepth)b, \(String(format: "%.0f", audioFile.sampleRate))hz, \(audioFile.formatID)"
             return viewCell
         case .duration:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
@@ -463,6 +463,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                     audioPlaybackManager.setPlayerItem(playerItem, duration: Float64(fileInfo.duration))
                     audioPlaybackManager.seek(to: 0.0)
                     waveformView.currentTime = 0.0
+                    let audioLength = formatTime(currentFileInfo!.duration)
+                    timeLabel.stringValue = "0:00.00 / \(audioLength)"
                 }
             }
         } else {

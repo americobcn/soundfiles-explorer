@@ -20,6 +20,7 @@ class AudioFileInfo: NSObject {
     var sampleRate: Double = 0
     var channelCount: Int = 0
     var bitDepth: Int = 0
+    var formatID: String = ""
     var playerItem: AVPlayerItem?
     var waveformData: [[Float]]?
     var isWaveformLoading: Bool = false
@@ -97,21 +98,30 @@ final class AudioFileLoader {
     private nonisolated func loadFileMetadataAndWaveforms(fileInfo: AudioFileInfo) async {
         do {
             let audioFile = try AVAudioFile(forReading: fileInfo.url)
-            let format = audioFile.processingFormat
-            let sampleRate = format.sampleRate
-            let channelCount = Int(format.channelCount)
-            let duration = Double(audioFile.length) / sampleRate
-            let asbd = format.streamDescription.pointee
-            let bitDepth = Int(asbd.mBitsPerChannel)
-
+            // let format = audioFile.processingFormat
+            // let sampleRate = format.sampleRate
+            // let channelCount = Int(format.channelCount)
+            // let duration = Double(audioFile.length) / sampleRate
+            // let asbd = format.streamDescription.pointee
+            
+            let audioAsset = AVURLAsset(url: fileInfo.url)
+            let audioTrack = try await audioAsset.loadTracks(withMediaType: .audio)
+            let formatDescription = try await audioTrack.first!.load(.formatDescriptions).first!
+            let asbd = formatDescription.audioStreamBasicDescription
+            let bitDepth = Int(asbd!.mBitsPerChannel)
+            let sampleRate = asbd!.mSampleRate
+            let channelCount = Int(asbd!.mChannelsPerFrame)
+            let duration = try await audioAsset.load(.duration)
+            let formatID = formatDescription.mediaSubType
+            
             await MainActor.run {
                 fileInfo.sampleRate = sampleRate
                 fileInfo.channelCount = channelCount
-                fileInfo.duration = duration
+                fileInfo.duration = duration.seconds
                 fileInfo.asbd = asbd
                 fileInfo.bitDepth = bitDepth
+                fileInfo.formatID = formatID.description                
             }
-
             guard let audioMetadata = try audioMetadataReader?.readAudioMetadata(from: fileInfo.url) else {
                 await MainActor.run { fileInfo.isMetadataLoading = false }
                 return
