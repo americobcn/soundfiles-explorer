@@ -407,7 +407,9 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         case .audioDescription:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
             else { return nil }
-            viewCell.textField!.stringValue = audioFile.isMetadataLoading ? "Loading..." : "\(audioFile.bext?.codingHistory ?? "")"
+            print("Coding History: \(audioFile.bext?.codingHistory ?? "")")
+            let ch = audioFile.bext?.codingHistory.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            viewCell.textField!.stringValue = audioFile.isMetadataLoading ? "Loading..." : "\(ch)"
             return viewCell
         case .duration:
             guard let viewCell = tableView.makeView(withIdentifier: colIdentifier, owner: nil ) as? NSTableCellView
@@ -866,7 +868,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             } else {                  // T — zoom in
                 self.zoomSlider.doubleValue *= 1.25
             }
-            print("Zoom slider value: \(self.zoomSlider.doubleValue)")
+            
             self.waveformView.setZoomLevel(CGFloat(self.zoomSlider.doubleValue))
             self.waveformView.updateContentSize()
             return nil // consume event — NSTableView never sees it
