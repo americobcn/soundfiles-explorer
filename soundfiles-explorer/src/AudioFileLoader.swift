@@ -21,7 +21,6 @@ class AudioFileInfo: NSObject {
     var channelCount: Int = 0
     var bitDepth: Int = 0
     var formatID: String = ""
-    var playerItem: AVPlayerItem?
     var waveformData: [[Float]]?
     var isWaveformLoading: Bool = false
     var isMetadataLoading: Bool = true
@@ -33,6 +32,8 @@ class AudioFileInfo: NSObject {
     var asbd: AudioStreamBasicDescription?
     var bext: BEXTMetadata?
     var ixml: IXMLMetadata?
+    var sourceFolderURL: URL? = nil
+    var projectID: UUID? = nil
     
     init(url: URL) {
         self.url = url
@@ -77,12 +78,7 @@ final class AudioFileLoader {
     /// - Parameter url: The URL of the audio file
     /// - Returns: AudioFileInfo with minimal info (just filename and URL)
     func createFileInfo(url: URL)  -> AudioFileInfo {
-        let fileInfo = AudioFileInfo(url: url)
-        
-        // Create playerItem IMMEDIATELY for playback (doesn't need metadata)
-        let asset = AVURLAsset(url: url)
-        fileInfo.playerItem = AVPlayerItem(asset: asset)
-        return fileInfo
+        return AudioFileInfo(url: url)
     }
     
     /// Loads metadata and waveforms for an existing AudioFileInfo
@@ -90,6 +86,20 @@ final class AudioFileLoader {
     /// - Parameter fileInfo: The AudioFileInfo to load data into
     nonisolated func loadMetadataAndWaveforms(for fileInfo: AudioFileInfo) async {
         await loadFileMetadataAndWaveforms(fileInfo: fileInfo)
+    }
+
+    nonisolated func loadMetadataAndWaveforms(forBatch fileInfos: [AudioFileInfo], maxConcurrent: Int = 3) async {
+        await withTaskGroup(of: Void.self) { group in
+            var inFlight = 0
+            for info in fileInfos {
+                if inFlight >= maxConcurrent {
+                    await group.next()
+                    inFlight -= 1
+                }
+                group.addTask { await self.loadMetadataAndWaveforms(for: info) }
+                inFlight += 1
+            }
+        }
     }
     
     // MARK: - Private Methods
@@ -170,11 +180,7 @@ final class AudioFileLoader {
                 )
             }
 
-            // Start waveform generation in a SEPARATE parallel task
-            // This allows metadata to display immediately while waveforms generate in background
-            Task.detached { [self] in
-                await self.generateWaveformsInBackground(audioFile: audioFile, fileInfo: fileInfo)
-            }
+            await generateWaveformsInBackground(audioFile: audioFile, fileInfo: fileInfo)
 
         } catch {
             print("Error loading file metadata for \(fileInfo.url.lastPathComponent): \(error)")
@@ -242,10 +248,13 @@ final class AudioFileLoader {
         
         var sampleCounter = 0
         var currentMaxes: [Float] = Array(repeating: 0, count: channelCount)
-        
+        var chunkCount = 0
+
         file.framePosition = 0
-        
+
         while file.framePosition < file.length {
+            chunkCount += 1
+            if chunkCount.isMultiple(of: 16) { await Task.yield() }
             do {
                 try file.read(into: buffer)
                 let frameLength = Int(buffer.frameLength)

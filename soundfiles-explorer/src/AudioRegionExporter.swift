@@ -100,7 +100,7 @@ final class AudioRegionExporter {
         var offset = 12  // skip RIFF(4) + size(4) + WAVE(4)
         while offset + 8 <= data.count {
             let chunkID = String(bytes: data[offset ..< offset + 4], encoding: .isoLatin1) ?? ""
-            let size    = Int(data[offset + 4 ..< offset + 8].withUnsafeBytes {                
+            let size    = Int(data[offset + 4 ..< offset + 8].withUnsafeBytes {
                 UInt32(littleEndian: $0.loadUnaligned(as: UInt32.self))
             })
             let padded  = size + (size % 2)

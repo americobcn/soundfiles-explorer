@@ -52,11 +52,14 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     private var filterPredicate: String = ""
     private var currentFileInfo: AudioFileInfo?
     private var notLoadedFiles: [String] = []
+    private var pendingReloadRows = IndexSet()
+    private var reloadFlushScheduled = false
     private let metadataReader = AudioMetadataReader()
     private let audioFileLoader = AudioFileLoader()
     private var timeLabel: NSTextField!
     private var channelLabelWidth: CGFloat = 80
     private var keyEventMonitor: Any?
+    var projectStore: ProjectStore!
 
 
     // MARK: - Init
@@ -439,33 +442,33 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                 let fileInfo = audioFiles[actualIndex]
                 self.currentFileInfo = fileInfo
 
-                // Setup playback immediately (playerItem is created right away)
-                if let playerItem = fileInfo.playerItem {
-                    // Update waveform view with data (may be nil if still loading)
-                    if let waveformData = fileInfo.waveformData {
-                        waveformView.setWaveformData(waveformData,
-                                                     duration: fileInfo.duration,
-                                                     sampleRate: fileInfo.sampleRate,
-                                                     channelCount: fileInfo.channelCount,
-                                                     names: fileInfo.tracksNames
-                        )
-                    } else {
-                        // Show loading state (waveforms not ready yet)
-                        waveformView.showLoadingState(duration: fileInfo.duration,
-                                                      sampleRate: fileInfo.sampleRate,
-                                                      channelCount: fileInfo.channelCount,
-                                                      names: fileInfo.tracksNames)
-                    }
-                    // Update channel labels
-                    setupChannelLabels()
-                    
-                    // Update playback manager with player item
-                    audioPlaybackManager.setPlayerItem(playerItem, duration: Float64(fileInfo.duration))
-                    audioPlaybackManager.seek(to: 0.0)
-                    waveformView.currentTime = 0.0
-                    let audioLength = formatTime(currentFileInfo!.duration)
-                    timeLabel.stringValue = "0:00.00 / \(audioLength)"
+                // Create the player item lazily — only the selected file holds one open
+                let playerItem = AVPlayerItem(url: fileInfo.url)
+
+                // Update waveform view with data (may be nil if still loading)
+                if let waveformData = fileInfo.waveformData {
+                    waveformView.setWaveformData(waveformData,
+                                                 duration: fileInfo.duration,
+                                                 sampleRate: fileInfo.sampleRate,
+                                                 channelCount: fileInfo.channelCount,
+                                                 names: fileInfo.tracksNames
+                    )
+                } else {
+                    // Show loading state (waveforms not ready yet)
+                    waveformView.showLoadingState(duration: fileInfo.duration,
+                                                  sampleRate: fileInfo.sampleRate,
+                                                  channelCount: fileInfo.channelCount,
+                                                  names: fileInfo.tracksNames)
                 }
+                // Update channel labels
+                setupChannelLabels()
+
+                // Update playback manager with player item
+                audioPlaybackManager.setPlayerItem(playerItem, duration: Float64(fileInfo.duration))
+                audioPlaybackManager.seek(to: 0.0)
+                waveformView.currentTime = 0.0
+                let audioLength = formatTime(currentFileInfo!.duration)
+                timeLabel.stringValue = "0:00.00 / \(audioLength)"
             }
         } else {
             // Clear everything when no file is selected (e.g., all files removed)
@@ -541,30 +544,27 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                 return false
             }
             notLoadedFiles.removeAll()
-            
-            // Collect all URLs first
+
             let urls = pasteboardObjects.compactMap { $0 as? URL }
-            
-            // Create file info objects synchronously (immediate)
-            let fileInfos = urls.map { audioFileLoader.createFileInfo(url: $0) }
-            audioFiles.append(contentsOf: fileInfos)
-            
-            // Update table view once after all files added
-            applyFilter()
-            tableView.reloadData()
-            
-            // Use Task.detached to break @MainActor inheritance (Swift 5.10 / macOS Sequoia fix)
-            let loader = audioFileLoader
-            Task.detached(priority: .utility) {
-                await withTaskGroup(of: Void.self) { group in
-                    for fileInfo in fileInfos {
-                        group.addTask {
-                            await loader.loadMetadataAndWaveforms(for: fileInfo)
-                        }
-                    }
+            let folders = urls.filter(\.hasDirectoryPath)
+            let files   = urls.filter { !$0.hasDirectoryPath }
+
+            if !folders.isEmpty {
+                Task { @MainActor in await handleFolderDrop(folders) }
+            }
+
+            if !files.isEmpty {
+                // Existing single-file drop path — unchanged
+                let fileInfos = files.map { audioFileLoader.createFileInfo(url: $0) }
+                audioFiles.append(contentsOf: fileInfos)
+                applyFilter()
+                tableView.reloadData()
+                let loader = audioFileLoader
+                Task.detached(priority: .utility) {
+                    await loader.loadMetadataAndWaveforms(forBatch: fileInfos)
                 }
             }
-                        
+
             if notLoadedFiles.count > 0 {
                 let alert = NSAlert()
                 alert.messageText = "Some files could not be loaded."
@@ -858,6 +858,20 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             object: waveformView
         )
 
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(projectDidChange(_:)),
+            name: ProjectStore.projectDidChangeNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(sidebarRequestedFolderScan(_:)),
+            name: .sidebarRequestsFolderScan,
+            object: nil
+        )
+
         keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
             guard event.keyCode == 15 || event.keyCode == 17 else { return event }
@@ -875,16 +889,31 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         }
     }
     
+    /// Coalesces per-file row reloads arriving in a burst into a single batched reload.
+    private func scheduleRowReload(_ displayedRow: Int) {
+        pendingReloadRows.insert(displayedRow)
+        guard !reloadFlushScheduled else { return }
+        reloadFlushScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.reloadFlushScheduled = false
+            let rows = self.pendingReloadRows
+            self.pendingReloadRows.removeAll()
+            guard !rows.isEmpty else { return }
+            self.tableView.reloadData(forRowIndexes: rows,
+                                      columnIndexes: IndexSet(integersIn: 0..<self.tableView.numberOfColumns))
+        }
+    }
+
     @objc private func fileMetadataLoaded(_ notification: Notification) {
         guard let url = notification.userInfo?["url"] as? URL else { return }
-        
-        // Find the file and reload its table row on main thread
+
         if let index = audioFiles.firstIndex(where: { $0.url == url }) {
-            // Find which displayed row corresponds to this index
             if let displayedRow = displayedIndices.firstIndex(of: index) {
-                DispatchQueue.main.async {
-                    self.tableView.reloadData(forRowIndexes: IndexSet([displayedRow]), columnIndexes: IndexSet(integersIn: 0..<self.tableView.numberOfColumns))
-                }
+                scheduleRowReload(displayedRow)
+            }
+            if audioFiles[index].projectID != nil {
+                try? projectStore?.updateAudioFileRecord(url: url, with: audioFiles[index])
             }
         }
     }
@@ -1006,4 +1035,86 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         channelLabelsContainer.needsLayout = true
         channelLabelsContainer.needsDisplay = true
     }
+
+    // MARK: - Projects
+
+    @objc private func projectDidChange(_ notification: Notification) {
+        guard let project = notification.object as? Project else { return }
+        loadProject(project)
+    }
+
+    @objc private func sidebarRequestedFolderScan(_ notification: Notification) {
+        guard let folders = notification.userInfo?["folders"] as? [URL],
+              let result  = notification.userInfo?["scanResult"] as? ScanResult else { return }
+        Task { @MainActor in
+            applyFolderScanResult(result, fromFolders: folders)
+        }
+    }
+
+    func loadProject(_ project: Project) {
+        audioPlaybackManager.stop()
+        currentFileInfo = nil
+        waveformView.clearWaveform()
+        audioFiles.removeAll()
+
+        let infos: [AudioFileInfo] = project.audioFileRecords.map { record in
+            let info = audioFileLoader.createFileInfo(url: record.url)
+            info.duration     = record.duration
+            info.sampleRate   = record.sampleRate
+            info.channelCount = record.channelCount
+            info.bitDepth     = record.bitDepth
+            info.formatID     = record.formatID
+            info.scene        = record.scene
+            info.take         = record.take
+            info.date         = record.date
+            info.timeCodeStart = record.timeCodeStart
+            info.tracksNames  = Dictionary(uniqueKeysWithValues: record.tracksNames.compactMap {
+                guard let k = Int($0.key) else { return nil }
+                return (k, $0.value)
+            })
+            info.isMetadataLoading = false
+            info.projectID = project.id
+            return info
+        }
+        audioFiles = infos
+        applyFilter()
+        tableView.reloadData()
+
+        let loader = audioFileLoader
+        Task.detached(priority: .utility) {
+            await loader.loadMetadataAndWaveforms(forBatch: infos)
+        }
+    }
+
+    private func handleFolderDrop(_ folders: [URL]) async {
+        let result = await FolderScanner().scan(folders: folders)
+        applyFolderScanResult(result, fromFolders: folders)
+    }
+
+    private func applyFolderScanResult(_ result: ScanResult, fromFolders folders: [URL]) {
+        let newInfos = result.audioFileURLs.map { url -> AudioFileInfo in
+            let info = audioFileLoader.createFileInfo(url: url)
+            info.sourceFolderURL = folders.first(where: { url.path.hasPrefix($0.path) })
+            return info
+        }
+
+        if let activeProject = projectStore?.activeProject {
+            try? projectStore.appendFolders(folders, to: activeProject.id, scanResult: result, newInfos: newInfos)
+            newInfos.forEach { $0.projectID = projectStore.activeProject?.id }
+        } else if !newInfos.isEmpty || !result.soundReportURLs.isEmpty {
+            let name = folders.first?.lastPathComponent ?? "New Project"
+            let project = try? projectStore?.createProject(name: name, scanResult: result, audioFileInfos: newInfos)
+            newInfos.forEach { $0.projectID = project?.id }
+        }
+
+        audioFiles.append(contentsOf: newInfos)
+        applyFilter()
+        tableView.reloadData()
+
+        let loader = audioFileLoader
+        Task.detached(priority: .utility) {
+            await loader.loadMetadataAndWaveforms(forBatch: newInfos)
+        }
+    }
 }
+

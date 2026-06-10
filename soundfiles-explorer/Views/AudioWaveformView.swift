@@ -984,7 +984,10 @@ extension AudioWaveformView {
     /// Call this when zoom changes to update the scroll view
     func updateContentSize() {
         invalidateIntrinsicContentSize()
-        enclosingScrollView?.layoutSubtreeIfNeeded()
+        // Don't force layout synchronously (layoutSubtreeIfNeeded) — it can re-enter
+        // an in-progress layout pass and overflow the stack. Deferred layout is enough:
+        // draw() re-renders whenever the frame differs from lastRenderedLayerFrame.
+        enclosingScrollView?.needsLayout = true
         needsDisplay = true
     }
     
