@@ -1078,6 +1078,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         waveformView.clearWaveform()
         audioFiles.removeAll()
 
+        var needsFullLoad: [AudioFileInfo] = []
+
         let infos: [AudioFileInfo] = project.audioFileRecords.map { record in
             let info = audioFileLoader.createFileInfo(url: record.url)
             info.duration     = record.duration
@@ -1089,21 +1091,34 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             info.take         = record.take
             info.date         = record.date
             info.timeCodeStart = record.timeCodeStart
+            info.bext         = record.bext
+            info.ixml         = record.ixml
             info.tracksNames  = Dictionary(uniqueKeysWithValues: record.tracksNames.compactMap {
                 guard let k = Int($0.key) else { return nil }
                 return (k, $0.value)
             })
             info.isMetadataLoading = false
             info.projectID = project.id
+
+            if let cachedWaveform = audioFileLoader.cachedWaveform(for: record.url) {
+                info.waveformData = cachedWaveform
+            } else {
+                needsFullLoad.append(info)
+            }
+
             return info
         }
         audioFiles = infos
         applyFilter()
         tableView.reloadData()
 
+        #if DEBUG
+        print("loadProject: \(infos.count - needsFullLoad.count)/\(infos.count) waveforms loaded from cache")
+        #endif
+
         let loader = audioFileLoader
         Task.detached(priority: .utility) {
-            await loader.loadMetadataAndWaveforms(forBatch: infos)
+            await loader.loadMetadataAndWaveforms(forBatch: needsFullLoad)
         }
     }
 

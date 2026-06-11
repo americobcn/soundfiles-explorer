@@ -23,6 +23,8 @@ struct AudioFileRecord: Codable {
     var date: String
     var timeCodeStart: String
     var tracksNames: [String: String]
+    var bext: BEXTMetadata?
+    var ixml: IXMLMetadata?
 }
 
 struct SoundReportRecord: Codable {

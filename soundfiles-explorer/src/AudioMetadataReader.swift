@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - BEXT Metadata Structure
 
-public struct BEXTMetadata {
+public struct BEXTMetadata: Codable {
     public let description: String
     public let originator: String
     public let originatorReference: String
@@ -53,7 +53,7 @@ public struct BEXTMetadata {
 
 // MARK: - iXML Metadata Structure
 
-public struct IXMLMetadata {
+public struct IXMLMetadata: Codable {
     public let rawXML: String
     public let parsedData: [String: String]
     

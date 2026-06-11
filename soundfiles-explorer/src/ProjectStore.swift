@@ -152,7 +152,9 @@ private extension AudioFileRecord {
             take: info.take,
             date: info.date,
             timeCodeStart: info.timeCodeStart,
-            tracksNames: stringKeys
+            tracksNames: stringKeys,
+            bext: info.bext,
+            ixml: info.ixml
         )
     }
 }

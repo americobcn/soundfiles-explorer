@@ -52,6 +52,7 @@ final class AudioFileLoader {
     
     nonisolated(unsafe) private let waveformCache: NSCache<NSString, WaveformCacheEntry>
     private let diskCache = WaveformDiskCache()
+    private static let pixelsPerSecond: CGFloat = 100
 
     private class WaveformCacheEntry: NSObject {
         nonisolated let waveforms: [[Float]]
@@ -213,29 +214,39 @@ final class AudioFileLoader {
         }
     }
     
+    /// Returns waveform data already cached (in memory or on disk) for `url` at its
+    /// current modification date, without opening the audio file. Returns nil if
+    /// nothing is cached yet.
+    nonisolated func cachedWaveform(for url: URL) -> [[Float]]? {
+        cachedWaveformEntry(for: url)
+    }
+
+    private nonisolated func cachedWaveformEntry(for url: URL) -> [[Float]]? {
+        let cacheKey = "\(url.absoluteString)-\(Self.pixelsPerSecond)" as NSString
+        if let cachedEntry = waveformCache.object(forKey: cacheKey) {
+            return cachedEntry.waveforms
+        }
+        if let cached = diskCache.load(for: url) {
+            waveformCache.setObject(WaveformCacheEntry(waveforms: cached), forKey: cacheKey)
+            return cached
+        }
+        return nil
+    }
+
     private nonisolated func generateWaveforms(from file: AVAudioFile, url: URL) async throws -> [[Float]] {
         let format = file.processingFormat
         let totalSamples = Int(file.length)
         let channelCount = Int(format.channelCount)
         let duration = Double(file.length) / format.sampleRate
-        
-        // Calculate pixels per second for caching (default 100)
-        let pixelsPerSecond: CGFloat = 100
-        
-        // L1: in-memory cache
-        let cacheKey = "\(url.absoluteString)-\(pixelsPerSecond)" as NSString
-        if let cachedEntry = waveformCache.object(forKey: cacheKey) {
-            return cachedEntry.waveforms
-        }
 
-        // L2: disk cache
-        if let cached = diskCache.load(for: url) {
-            waveformCache.setObject(WaveformCacheEntry(waveforms: cached), forKey: cacheKey)
+        let cacheKey = "\(url.absoluteString)-\(Self.pixelsPerSecond)" as NSString
+
+        if let cached = cachedWaveformEntry(for: url) {
             return cached
         }
 
         // Determine samples per point
-        let desiredWaveformPoints = Int(duration * Double(pixelsPerSecond))
+        let desiredWaveformPoints = Int(duration * Double(Self.pixelsPerSecond))
         let samplesPerPoint = max(1, totalSamples / desiredWaveformPoints)
         
         var channelMaxValues: [[Float]] = Array(repeating: [], count: channelCount)
@@ -357,8 +368,19 @@ private final class WaveformDiskCache {
     private nonisolated func cacheFileURL(for audioURL: URL) -> URL {
         let modDate = (try? FileManager.default.attributesOfItem(atPath: audioURL.path)[.modificationDate] as? Date) ?? Date.distantPast
         let key = "\(audioURL.absoluteString)-\(modDate.timeIntervalSinceReferenceDate)"
-        let hashValue = abs(key.hashValue)
-        return cacheDirectory.appendingPathComponent("\(hashValue).wfcache")
+        return cacheDirectory.appendingPathComponent("\(stableHash(key)).wfcache")
+    }
+
+    /// `String.hashValue` is randomized per process launch (hash-flood protection),
+    /// so it can't be used to derive a filename that must resolve to the same
+    /// cache entry on the next launch. FNV-1a is deterministic across runs.
+    private nonisolated func stableHash(_ string: String) -> UInt64 {
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in string.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x100000001b3
+        }
+        return hash
     }
 
     private nonisolated func encode(_ waveforms: [[Float]]) -> Data {
