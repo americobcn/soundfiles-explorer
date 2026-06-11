@@ -867,6 +867,13 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
 
         NotificationCenter.default.addObserver(
             self,
+            selector: #selector(projectDidDelete(_:)),
+            name: ProjectStore.projectDidDeleteNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
             selector: #selector(sidebarRequestedFolderScan(_:)),
             name: .sidebarRequestsFolderScan,
             object: nil
@@ -1041,6 +1048,20 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     @objc private func projectDidChange(_ notification: Notification) {
         guard let project = notification.object as? Project else { return }
         loadProject(project)
+    }
+
+    @objc private func projectDidDelete(_ notification: Notification) {
+        guard let deletedID = notification.object as? UUID,
+              audioFiles.contains(where: { $0.projectID == deletedID }) else { return }
+
+        audioPlaybackManager.stop()
+        currentFileInfo = nil
+        waveformView.clearWaveform()
+        audioFiles.removeAll { $0.projectID == deletedID }
+        applyFilter()
+        tableView.reloadData()
+        setupChannelLabels()
+        timeLabel.stringValue = "0:00.00 / 0:00.00"
     }
 
     @objc private func sidebarRequestedFolderScan(_ notification: Notification) {

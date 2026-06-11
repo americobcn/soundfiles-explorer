@@ -4,6 +4,7 @@ import Foundation
 final class ProjectStore {
     static let projectDidChangeNotification = Notification.Name("ProjectDidChange")
     static let projectListDidChangeNotification = Notification.Name("ProjectListDidChange")
+    static let projectDidDeleteNotification = Notification.Name("ProjectDidDelete")
 
     private(set) var projects: [Project] = []
     private(set) var activeProject: Project?
@@ -123,6 +124,7 @@ final class ProjectStore {
         projects.removeAll { $0.id == id }
         if activeProject?.id == id { activeProject = nil }
         try save()
+        NotificationCenter.default.post(name: Self.projectDidDeleteNotification, object: id)
     }
 
     func rename(id: UUID, name: String) throws {

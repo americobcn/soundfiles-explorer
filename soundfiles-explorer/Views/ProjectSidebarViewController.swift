@@ -176,6 +176,7 @@ final class ProjectSidebarViewController: NSViewController {
             try? self?.store.delete(id: project.id)
             self?.projectTableView.reloadData()
             self?.reportTableView.reloadData()
+            self?.projectTableView.deselectAll(nil)
         }
     }
 

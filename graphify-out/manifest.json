@@ -1,0 +1,192 @@
+{
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.claude/settings.local.json": {
+    "mtime": 1781028765.4194727,
+    "ast_hash": "bcac63d74d61ef28b471c762205efa23",
+    "semantic_hash": "bcac63d74d61ef28b471c762205efa23"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/soundfiles-explorer/AppDelegate.swift": {
+    "mtime": 1771000321.0,
+    "ast_hash": "620a7a16ecad1be88612b657ec3dbb75",
+    "semantic_hash": "620a7a16ecad1be88612b657ec3dbb75"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/soundfiles-explorer/Assets.xcassets/AccentColor.colorset/Contents.json": {
+    "mtime": 1768859436.0,
+    "ast_hash": "55019f7265dde0a78318b0807f98e847",
+    "semantic_hash": "55019f7265dde0a78318b0807f98e847"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/soundfiles-explorer/Assets.xcassets/AppIcon.appiconset/Contents.json": {
+    "mtime": 1768859436.0,
+    "ast_hash": "312293803cc066cebe794885fe1ddcfe",
+    "semantic_hash": "312293803cc066cebe794885fe1ddcfe"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/soundfiles-explorer/Assets.xcassets/Contents.json": {
+    "mtime": 1768859436.0,
+    "ast_hash": "9deb2ada1cc834bbebf8bbad9c8978a1",
+    "semantic_hash": "9deb2ada1cc834bbebf8bbad9c8978a1"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/soundfiles-explorer/Views/AC3TableView.swift": {
+    "mtime": 1771177243.0,
+    "ast_hash": "249391726264edd47fc1661199b6b55f",
+    "semantic_hash": "249391726264edd47fc1661199b6b55f"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/soundfiles-explorer/Views/AudioWaveformExtensions.swift": {
+    "mtime": 1771177242.0,
+    "ast_hash": "a5fdc80cdead9ce8ac8bf760fb9d96d3",
+    "semantic_hash": "a5fdc80cdead9ce8ac8bf760fb9d96d3"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/soundfiles-explorer/Views/AudioWaveformView.swift": {
+    "mtime": 1773508568.0,
+    "ast_hash": "f6650d005241e2fd7dcd17713226a53b",
+    "semantic_hash": "f6650d005241e2fd7dcd17713226a53b"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/soundfiles-explorer/src/AudioFileLoader.swift": {
+    "mtime": 1773779543.0,
+    "ast_hash": "95152b6467e5b86278d080cd4e490345",
+    "semantic_hash": "95152b6467e5b86278d080cd4e490345"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/soundfiles-explorer/src/AudioMetadataReader.swift": {
+    "mtime": 1773513345.0,
+    "ast_hash": "ca702d80f8e59f44f6c26ef58feaf879",
+    "semantic_hash": "ca702d80f8e59f44f6c26ef58feaf879"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/soundfiles-explorer/src/AudioParserError.swift": {
+    "mtime": 1771177238.0,
+    "ast_hash": "ba20127df158eabd3e48a36bd242cd85",
+    "semantic_hash": "ba20127df158eabd3e48a36bd242cd85"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/soundfiles-explorer/src/AudioPlaybackManager.swift": {
+    "mtime": 1773513962.0,
+    "ast_hash": "7532594ef0311ccb6d151e157ca8d602",
+    "semantic_hash": "7532594ef0311ccb6d151e157ca8d602"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/soundfiles-explorer/src/AudioRegionExporter.swift": {
+    "mtime": 1780423847.9462192,
+    "ast_hash": "58811b305a04dc383f89d90935160ec2",
+    "semantic_hash": "58811b305a04dc383f89d90935160ec2"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/soundfiles-explorer/src/MVC.swift": {
+    "mtime": 1780422138.323904,
+    "ast_hash": "93bbd9942100cecc780b35d8662d2b66",
+    "semantic_hash": "93bbd9942100cecc780b35d8662d2b66"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.agents/skills/swift-concurrency/SKILL.md": {
+    "mtime": 1771177787.0,
+    "ast_hash": "e2b09483ea2d4255a561217b264dd2ad",
+    "semantic_hash": "e2b09483ea2d4255a561217b264dd2ad"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.agents/skills/swift-concurrency/references/actors.md": {
+    "mtime": 1771177787.0,
+    "ast_hash": "dccff2474bff1e1230e84c993b11a2ac",
+    "semantic_hash": "dccff2474bff1e1230e84c993b11a2ac"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.agents/skills/swift-concurrency/references/async-algorithms.md": {
+    "mtime": 1771177787.0,
+    "ast_hash": "4d22bdebacea2b8ac37b76438069ac63",
+    "semantic_hash": "4d22bdebacea2b8ac37b76438069ac63"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.agents/skills/swift-concurrency/references/async-await-basics.md": {
+    "mtime": 1771177787.0,
+    "ast_hash": "9f23729efbbc5af50cf526b2f7fac134",
+    "semantic_hash": "9f23729efbbc5af50cf526b2f7fac134"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.agents/skills/swift-concurrency/references/async-sequences.md": {
+    "mtime": 1771177787.0,
+    "ast_hash": "793fedc25cdc76d89f317b61109b8164",
+    "semantic_hash": "793fedc25cdc76d89f317b61109b8164"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.agents/skills/swift-concurrency/references/core-data.md": {
+    "mtime": 1771177787.0,
+    "ast_hash": "bdff1d05cf53f909549146e262627da5",
+    "semantic_hash": "bdff1d05cf53f909549146e262627da5"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.agents/skills/swift-concurrency/references/glossary.md": {
+    "mtime": 1771177787.0,
+    "ast_hash": "1edf5ddb6fe19552b2ee9bfe70065950",
+    "semantic_hash": "1edf5ddb6fe19552b2ee9bfe70065950"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.agents/skills/swift-concurrency/references/linting.md": {
+    "mtime": 1771177787.0,
+    "ast_hash": "7f27db66644f782dfe66b1135bd48554",
+    "semantic_hash": "7f27db66644f782dfe66b1135bd48554"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.agents/skills/swift-concurrency/references/memory-management.md": {
+    "mtime": 1771177787.0,
+    "ast_hash": "f4f45a58fde8075837c64e8de3f1523c",
+    "semantic_hash": "f4f45a58fde8075837c64e8de3f1523c"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.agents/skills/swift-concurrency/references/migration.md": {
+    "mtime": 1771177787.0,
+    "ast_hash": "906e0db31f7b6b586f6aded69048d041",
+    "semantic_hash": "906e0db31f7b6b586f6aded69048d041"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.agents/skills/swift-concurrency/references/performance.md": {
+    "mtime": 1771177787.0,
+    "ast_hash": "2b4369ffc772ed441943d6991d3b531e",
+    "semantic_hash": "2b4369ffc772ed441943d6991d3b531e"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.agents/skills/swift-concurrency/references/sendable.md": {
+    "mtime": 1771177787.0,
+    "ast_hash": "7467377bab29036e64b2f65388d828dc",
+    "semantic_hash": "7467377bab29036e64b2f65388d828dc"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.agents/skills/swift-concurrency/references/tasks.md": {
+    "mtime": 1771177787.0,
+    "ast_hash": "b342f53afddb86514a3d6bf6c7b59e1f",
+    "semantic_hash": "b342f53afddb86514a3d6bf6c7b59e1f"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.agents/skills/swift-concurrency/references/testing.md": {
+    "mtime": 1771177787.0,
+    "ast_hash": "e2c6ffcdc8328b017baa8edb6ed11641",
+    "semantic_hash": "e2c6ffcdc8328b017baa8edb6ed11641"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.agents/skills/swift-concurrency/references/threading.md": {
+    "mtime": 1771177787.0,
+    "ast_hash": "c8a9f0f4515deaed81ee58c672a19483",
+    "semantic_hash": "c8a9f0f4515deaed81ee58c672a19483"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.superpowers/brainstorm/3008-1773340030/interaction-states.html": {
+    "mtime": 1773340489.0,
+    "ast_hash": "2bc6ae07de2776c51f5142fd5cb6c5dd",
+    "semantic_hash": "2bc6ae07de2776c51f5142fd5cb6c5dd"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.superpowers/brainstorm/3008-1773340030/region-selection-style.html": {
+    "mtime": 1773340086.0,
+    "ast_hash": "9df6132f001317122f2564d59507124f",
+    "semantic_hash": "9df6132f001317122f2564d59507124f"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.superpowers/brainstorm/3008-1773340030/waiting-1.html": {
+    "mtime": 1773340175.0,
+    "ast_hash": "44b3ae034f564b8ed722d684a274336d",
+    "semantic_hash": "44b3ae034f564b8ed722d684a274336d"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/.superpowers/brainstorm/3008-1773340030/waiting-2.html": {
+    "mtime": 1773340600.0,
+    "ast_hash": "e8ecb4b3faa27f2a06f6aaa1b8053610",
+    "semantic_hash": "e8ecb4b3faa27f2a06f6aaa1b8053610"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/AGENTS.md": {
+    "mtime": 1770998018.0,
+    "ast_hash": "3b697d89596e2d2cc9585ffd4a1736fe",
+    "semantic_hash": "3b697d89596e2d2cc9585ffd4a1736fe"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/CLAUDE.md": {
+    "mtime": 1772816086.0,
+    "ast_hash": "16130f84d0a6cbf7a00a459257acaaad",
+    "semantic_hash": "16130f84d0a6cbf7a00a459257acaaad"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/docs/superpowers/plans/2026-03-12-region-selection.md": {
+    "mtime": 1773341364.0,
+    "ast_hash": "6351ba384035afeeb54444190045b6de",
+    "semantic_hash": "6351ba384035afeeb54444190045b6de"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/docs/superpowers/specs/2026-03-12-region-selection-drag-design.md": {
+    "mtime": 1773340795.0,
+    "ast_hash": "8042e0829ab20bfdc247f81549a26048",
+    "semantic_hash": "8042e0829ab20bfdc247f81549a26048"
+  },
+  "/Users/americo/dev/Xcode Projects/soundfiles-explorer/soundfiles-explorer/Views/README.md": {
+    "mtime": 1769783316.0,
+    "ast_hash": "1639e6668fdc112a763429e720de175b",
+    "semantic_hash": "1639e6668fdc112a763429e720de175b"
+  }
+}
