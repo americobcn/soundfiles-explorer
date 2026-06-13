@@ -104,6 +104,8 @@ final class ProjectSidebarViewController: NSViewController {
         let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("report"))
         col.resizingMask = .autoresizingMask
         table.addTableColumn(col)
+        table.target = self
+        table.doubleAction = #selector(openSoundReport)
         scrollView.documentView = table
         reportTableView = table
         reportSection.addSubview(scrollView)
@@ -200,6 +202,13 @@ final class ProjectSidebarViewController: NSViewController {
             self?.reportTableView.reloadData()
             self?.projectTableView.deselectAll(nil)
         }
+    }
+
+    @objc private func openSoundReport() {
+        let row = reportTableView.clickedRow
+        guard let reports = store.activeProject?.soundReportRecords,
+              row >= 0, row < reports.count else { return }
+        NSWorkspace.shared.open(reports[row].url)
     }
 
     @objc private func projectStoreChanged() {
@@ -350,10 +359,6 @@ extension ProjectSidebarViewController: NSTableViewDelegate {
         guard row >= 0, row < store.projects.count else { return }
         store.activate(store.projects[row])
         reportTableView.reloadData()
-    }
-
-    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
-        return tableView === projectTableView
     }
 }
 
