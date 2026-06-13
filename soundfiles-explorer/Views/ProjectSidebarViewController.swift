@@ -5,7 +5,6 @@ final class ProjectSidebarViewController: NSViewController {
     private let store: ProjectStore
     private var projectTableView: NSTableView!
     private var reportTableView: NSTableView!
-    private var reportDisclosure: NSButton!
     private var reportSection: NSView!
 
     init(store: ProjectStore) {
@@ -82,12 +81,16 @@ final class ProjectSidebarViewController: NSViewController {
         reportSection = NSView()
         reportSection.translatesAutoresizingMaskIntoConstraints = false
 
-        reportDisclosure = NSButton(title: "Sound Reports", target: self, action: #selector(toggleReports))
-        reportDisclosure.setButtonType(.pushOnPushOff)
-        reportDisclosure.bezelStyle = .disclosure
-        reportDisclosure.state = .on
-        reportDisclosure.translatesAutoresizingMaskIntoConstraints = false
-        reportSection.addSubview(reportDisclosure)
+        let divider = NSBox()
+        divider.boxType = .separator
+        divider.translatesAutoresizingMaskIntoConstraints = false
+        reportSection.addSubview(divider)
+
+        let titleLabel = NSTextField(labelWithString: "Sound Reports")
+        titleLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold)
+        titleLabel.textColor = .secondaryLabelColor
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        reportSection.addSubview(titleLabel)
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
@@ -106,9 +109,14 @@ final class ProjectSidebarViewController: NSViewController {
         reportSection.addSubview(scrollView)
 
         NSLayoutConstraint.activate([
-            reportDisclosure.topAnchor.constraint(equalTo: reportSection.topAnchor, constant: 4),
-            reportDisclosure.leadingAnchor.constraint(equalTo: reportSection.leadingAnchor, constant: 8),
-            scrollView.topAnchor.constraint(equalTo: reportDisclosure.bottomAnchor, constant: 2),
+            divider.topAnchor.constraint(equalTo: reportSection.topAnchor),
+            divider.leadingAnchor.constraint(equalTo: reportSection.leadingAnchor),
+            divider.trailingAnchor.constraint(equalTo: reportSection.trailingAnchor),
+
+            titleLabel.topAnchor.constraint(equalTo: divider.bottomAnchor, constant: 4),
+            titleLabel.leadingAnchor.constraint(equalTo: reportSection.leadingAnchor, constant: 8),
+
+            scrollView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
             scrollView.leadingAnchor.constraint(equalTo: reportSection.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: reportSection.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: reportSection.bottomAnchor),
@@ -116,7 +124,7 @@ final class ProjectSidebarViewController: NSViewController {
 
         view.addSubview(reportSection)
         NSLayoutConstraint.activate([
-            reportSection.topAnchor.constraint(equalTo: view.topAnchor, constant: view.frame.height * 0.55 + 40),
+            reportSection.topAnchor.constraint(equalTo: projectTableView.enclosingScrollView!.bottomAnchor),
             reportSection.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             reportSection.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             reportSection.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -165,10 +173,6 @@ final class ProjectSidebarViewController: NSViewController {
             guard response == .OK, !panel.urls.isEmpty else { return }
             self?.scanAndCreateOrAppend(folders: panel.urls, intent: .appendTo(project.id))
         }
-    }
-
-    @objc private func toggleReports() {
-        reportTableView.superview?.superview?.isHidden = reportDisclosure.state == .off
     }
 
     @objc private func renameProject() {

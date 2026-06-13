@@ -231,6 +231,8 @@ class AudioWaveformView: NSView {
         self.sampleRate = sampleRate
         
         channelNames = Array(repeating: "", count: channelCount)
+        if channelCount == 0 { return }
+        
         for (idx, _) in channelWaveforms.enumerated() {
             if names[idx + 1] != nil && names[idx + 1]?.isEmpty == false {
                 channelNames[idx] = "\(names[idx + 1]!)\nCh \(idx + 1)"
