@@ -1067,8 +1067,9 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     @objc private func sidebarRequestedFolderScan(_ notification: Notification) {
         guard let folders = notification.userInfo?["folders"] as? [URL],
               let result  = notification.userInfo?["scanResult"] as? ScanResult else { return }
+        let intent = notification.userInfo?["intent"] as? FolderScanIntent
         Task { @MainActor in
-            applyFolderScanResult(result, fromFolders: folders)
+            applyFolderScanResult(result, fromFolders: folders, intent: intent)
         }
     }
 
@@ -1127,29 +1128,50 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         applyFolderScanResult(result, fromFolders: folders)
     }
 
-    private func applyFolderScanResult(_ result: ScanResult, fromFolders folders: [URL]) {
+    private func applyFolderScanResult(_ result: ScanResult, fromFolders folders: [URL], intent: FolderScanIntent? = nil) {
         let newInfos = result.audioFileURLs.map { url -> AudioFileInfo in
             let info = audioFileLoader.createFileInfo(url: url)
             info.sourceFolderURL = folders.first(where: { url.path.hasPrefix($0.path) })
             return info
         }
 
-        if let activeProject = projectStore?.activeProject {
-            try? projectStore.appendFolders(folders, to: activeProject.id, scanResult: result, newInfos: newInfos)
-            newInfos.forEach { $0.projectID = projectStore.activeProject?.id }
-        } else if !newInfos.isEmpty || !result.soundReportURLs.isEmpty {
+        switch intent {
+        case .createNew:
             let name = folders.first?.lastPathComponent ?? "New Project"
             let project = try? projectStore?.createProject(name: name, scanResult: result, audioFileInfos: newInfos)
             newInfos.forEach { $0.projectID = project?.id }
-        }
+            audioFiles = newInfos
+            applyFilter()
+            tableView.reloadData()
+            let loader = audioFileLoader
+            Task.detached(priority: .utility) {
+                await loader.loadMetadataAndWaveforms(forBatch: newInfos)
+            }
 
-        audioFiles.append(contentsOf: newInfos)
-        applyFilter()
-        tableView.reloadData()
+        case .appendTo(let id):
+            try? projectStore?.appendFolders(folders, to: id, scanResult: result, newInfos: newInfos)
+            if let project = projectStore?.projects.first(where: { $0.id == id }) {
+                loadProject(project)
+            }
 
-        let loader = audioFileLoader
-        Task.detached(priority: .utility) {
-            await loader.loadMetadataAndWaveforms(forBatch: newInfos)
+        case nil:
+            if let activeProject = projectStore?.activeProject {
+                try? projectStore.appendFolders(folders, to: activeProject.id, scanResult: result, newInfos: newInfos)
+                newInfos.forEach { $0.projectID = projectStore.activeProject?.id }
+            } else if !newInfos.isEmpty || !result.soundReportURLs.isEmpty {
+                let name = folders.first?.lastPathComponent ?? "New Project"
+                let project = try? projectStore?.createProject(name: name, scanResult: result, audioFileInfos: newInfos)
+                newInfos.forEach { $0.projectID = project?.id }
+            }
+
+            audioFiles.append(contentsOf: newInfos)
+            applyFilter()
+            tableView.reloadData()
+
+            let loader = audioFileLoader
+            Task.detached(priority: .utility) {
+                await loader.loadMetadataAndWaveforms(forBatch: newInfos)
+            }
         }
     }
 }

@@ -33,7 +33,7 @@ final class ProjectSidebarViewController: NSViewController {
     // MARK: - Setup
 
     private func setupAddButton() {
-        let button = NSButton(title: "+ New Folder", target: self, action: #selector(openFolderPicker))
+        let button = NSButton(title: "+ New Project", target: self, action: #selector(openFolderPicker))
         button.bezelStyle = .rounded
         button.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(button)
@@ -62,7 +62,9 @@ final class ProjectSidebarViewController: NSViewController {
         projectTableView = table
 
         let menu = NSMenu()
+        menu.addItem(NSMenuItem(title: "Add Folder to Project...", action: #selector(addFolderToProject), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Rename", action: #selector(renameProject), keyEquivalent: ""))
+        menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Delete Project", action: #selector(deleteProject), keyEquivalent: ""))
         table.menu = menu
 
@@ -142,10 +144,25 @@ final class ProjectSidebarViewController: NSViewController {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
-        panel.prompt = "Add to Project"
+        panel.prompt = "Create Project"
         panel.beginSheetModal(for: view.window!) { [weak self] response in
             guard response == .OK, !panel.urls.isEmpty else { return }
-            self?.scanAndCreateOrAppend(folders: panel.urls)
+            self?.scanAndCreateOrAppend(folders: panel.urls, intent: .createNew)
+        }
+    }
+
+    @objc private func addFolderToProject() {
+        let row = projectTableView.clickedRow
+        guard row >= 0, row < store.projects.count else { return }
+        let project = store.projects[row]
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Add Folder"
+        panel.beginSheetModal(for: view.window!) { [weak self] response in
+            guard response == .OK, !panel.urls.isEmpty else { return }
+            self?.scanAndCreateOrAppend(folders: panel.urls, intent: .appendTo(project.id))
         }
     }
 
@@ -191,7 +208,7 @@ final class ProjectSidebarViewController: NSViewController {
 
     // MARK: - Scan and Create/Append
 
-    private func scanAndCreateOrAppend(folders: [URL]) {
+    private func scanAndCreateOrAppend(folders: [URL], intent: FolderScanIntent) {
         Task { @MainActor in
             let scanner = FolderScanner()
             let result = await scanner.scan(folders: folders)
@@ -199,10 +216,17 @@ final class ProjectSidebarViewController: NSViewController {
             NotificationCenter.default.post(
                 name: .sidebarRequestsFolderScan,
                 object: nil,
-                userInfo: ["folders": folders, "scanResult": result]
+                userInfo: ["folders": folders, "scanResult": result, "intent": intent]
             )
         }
     }
+}
+
+// MARK: - Folder Scan Intent
+
+enum FolderScanIntent {
+    case createNew
+    case appendTo(UUID)
 }
 
 // MARK: - NSNotification extension
