@@ -55,6 +55,7 @@ final class ProjectSidebarViewController: NSViewController {
         table.allowsMultipleSelection = false
         table.delegate = self
         table.dataSource = self
+        table.registerForDraggedTypes([.fileURL])
         let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("project"))
         col.resizingMask = .autoresizingMask
         table.addTableColumn(col)
@@ -242,6 +243,42 @@ extension ProjectSidebarViewController: NSTableViewDataSource {
         if tableView === projectTableView { return store.projects.count }
         if tableView === reportTableView { return store.activeProject?.soundReportRecords.count ?? 0 }
         return 0
+    }
+
+    private func draggedFolderURLs(from info: NSDraggingInfo) -> [URL] {
+        guard let objects = info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: nil) else { return [] }
+        return objects.compactMap { $0 as? URL }.filter(\.hasDirectoryPath)
+    }
+
+    func tableView(_ tableView: NSTableView,
+                   validateDrop info: NSDraggingInfo,
+                   proposedRow row: Int,
+                   proposedDropOperation dropOperation: NSTableView.DropOperation) -> NSDragOperation
+    {
+        guard !draggedFolderURLs(from: info).isEmpty else { return [] }
+
+        if dropOperation == .on, row >= 0, row < store.projects.count {
+            tableView.setDropRow(row, dropOperation: .on)
+        } else {
+            tableView.setDropRow(store.projects.count, dropOperation: .above)
+        }
+        return .copy
+    }
+
+    func tableView(_ tableView: NSTableView,
+                   acceptDrop info: NSDraggingInfo,
+                   row: Int,
+                   dropOperation: NSTableView.DropOperation) -> Bool
+    {
+        let folders = draggedFolderURLs(from: info)
+        guard !folders.isEmpty else { return false }
+
+        if dropOperation == .on, row >= 0, row < store.projects.count {
+            scanAndCreateOrAppend(folders: folders, intent: .appendTo(store.projects[row].id))
+        } else {
+            scanAndCreateOrAppend(folders: folders, intent: .createNew)
+        }
+        return true
     }
 }
 
