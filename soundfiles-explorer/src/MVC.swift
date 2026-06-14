@@ -45,7 +45,8 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
     private var playPauseButton: NSButton!
     private var zoomSlider: NSSlider!
     private var channelLabelsContainer: NSStackView!
-    private var channelLabelViews: [NSTextField] = []
+    private var channelLabelViews: [ChannelLabelView] = []
+    private var enabledChannels: Set<Int> = []
     private var displayLink: CADisplayLink?
     private var audioFiles: [AudioFileInfo] = []
     private var displayedIndices: [Int] = []
@@ -440,9 +441,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             Task {
                 let fileInfo = audioFiles[actualIndex]
                 self.currentFileInfo = fileInfo
-
-                // Create the player item lazily — only the selected file holds one open
-                let playerItem = AVPlayerItem(url: fileInfo.url)
+                self.enabledChannels = defaultEnabledChannels(for: fileInfo)
 
                 // Update waveform view with data (may be nil if still loading)
                 if let waveformData = fileInfo.waveformData {
@@ -462,8 +461,11 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
                 // Update channel labels
                 setupChannelLabels()
 
-                // Update playback manager with player item
-                audioPlaybackManager.setPlayerItem(playerItem, duration: Float64(fileInfo.duration))
+                // Load the selected file lazily — only the selected file holds a player item open
+                await audioPlaybackManager.setAudioURL(fileInfo.url,
+                                                        channelCount: fileInfo.channelCount,
+                                                        enabledChannels: enabledChannels,
+                                                        duration: Float64(fileInfo.duration))
                 audioPlaybackManager.seek(to: 0.0)
                 waveformView.currentTime = 0.0
                 let audioLength = formatTime(currentFileInfo!.duration)
@@ -472,6 +474,7 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         } else {
             // Clear everything when no file is selected (e.g., all files removed)
             currentFileInfo = nil
+            enabledChannels = []
             if audioPlaybackManager.isPlaying {
                 audioPlaybackManager.stop()
             }
@@ -1003,27 +1006,29 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         let channelNames = waveformView.channelNames
         let channelHeight = waveformView.channelHeight
         let channelSpacing = CGFloat(1) // Match AudioWaveformView
-        
+        let channelColors = waveformView.waveformColors
+
         guard !channelNames.isEmpty else { return }
-        
+
         // Create labels for each channel
-        for (_, channelName) in channelNames.enumerated() {
-            let label = NSTextField(labelWithString: channelName)
-            label.font = NSFont.systemFont(ofSize: 11, weight: .regular)
-            label.textColor = NSColor.white
-            label.alignment = NSTextAlignment.left
-            label.isEditable = false
-            label.isBordered = true
-            label.translatesAutoresizingMaskIntoConstraints = false
-            label.setContentHuggingPriority(NSLayoutConstraint.Priority.required, for: NSLayoutConstraint.Orientation.vertical)
-            label.setContentCompressionResistancePriority(NSLayoutConstraint.Priority.required, for: NSLayoutConstraint.Orientation.vertical)
-            
+        for (index, channelName) in channelNames.enumerated() {
+            let color = channelColors[index % channelColors.count]
+            let labelView = ChannelLabelView(channelIndex: index,
+                                              channelName: channelName,
+                                              channelColor: color,
+                                              isEnabled: enabledChannels.contains(index))
+            labelView.onToggle = { [weak self] channelIndex in
+                self?.toggleChannel(channelIndex)
+            }
+            labelView.setContentHuggingPriority(NSLayoutConstraint.Priority.required, for: NSLayoutConstraint.Orientation.vertical)
+            labelView.setContentCompressionResistancePriority(NSLayoutConstraint.Priority.required, for: NSLayoutConstraint.Orientation.vertical)
+
             // Add height constraint
-            label.heightAnchor.constraint(equalToConstant: channelHeight).isActive = true
-            label.widthAnchor.constraint(equalToConstant: channelLabelWidth).isActive = true
-            
-            channelLabelViews.append(label)
-            channelLabelsContainer.addArrangedSubview(label)
+            labelView.heightAnchor.constraint(equalToConstant: channelHeight).isActive = true
+            labelView.widthAnchor.constraint(equalToConstant: channelLabelWidth).isActive = true
+
+            channelLabelViews.append(labelView)
+            channelLabelsContainer.addArrangedSubview(labelView)
         }
         
         // Set container spacing to match waveform view
@@ -1040,6 +1045,38 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
         // Force layout update
         channelLabelsContainer.needsLayout = true
         channelLabelsContainer.needsDisplay = true
+    }
+
+    /// Determines which channels are audible by default for a newly selected file:
+    /// channels whose name contains "mix" (case-insensitive); otherwise channels 1 & 2
+    /// (or just channel 1 if mono).
+    private func defaultEnabledChannels(for fileInfo: AudioFileInfo) -> Set<Int> {
+        let channelCount = fileInfo.channelCount
+        guard channelCount > 0 else { return [] }
+
+        let mixChannels = Set(fileInfo.tracksNames.compactMap { index, name -> Int? in
+            guard name.lowercased().contains("mix") else { return nil }
+            let channelIndex = index - 1
+            return (0..<channelCount).contains(channelIndex) ? channelIndex : nil
+        })
+        if !mixChannels.isEmpty {
+            return mixChannels
+        }
+
+        return channelCount == 1 ? [0] : [0, 1]
+    }
+
+    /// Toggles audibility of a single channel and applies it to the active playback item.
+    private func toggleChannel(_ index: Int) {
+        if enabledChannels.contains(index) {
+            enabledChannels.remove(index)
+        } else {
+            enabledChannels.insert(index)
+        }
+        if index < channelLabelViews.count {
+            channelLabelViews[index].isChannelEnabled = enabledChannels.contains(index)
+        }
+        audioPlaybackManager.setEnabledChannels(enabledChannels, channelCount: currentFileInfo?.channelCount ?? 0)
     }
 
     // MARK: - Projects

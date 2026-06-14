@@ -700,10 +700,10 @@
                 <rect key="frame" x="0.0" y="0.0" width="1920" height="1060"/>
                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                 <subviews>
-                    <customView translatesAutoresizingMaskIntoConstraints="NO" id="kjg-HW-iyx" customClass="NSStackView">
+                    <customView ambiguous="YES" translatesAutoresizingMaskIntoConstraints="NO" id="kjg-HW-iyx" customClass="NSStackView">
                         <rect key="frame" x="20" y="220" width="1881" height="840"/>
                     </customView>
-                    <searchField wantsLayer="YES" focusRingType="none" verticalHuggingPriority="750" textCompletion="NO" translatesAutoresizingMaskIntoConstraints="NO" id="1bJ-2h-6wJ">
+                    <searchField wantsLayer="YES" focusRingType="none" verticalHuggingPriority="750" ambiguous="YES" textCompletion="NO" translatesAutoresizingMaskIntoConstraints="NO" id="1bJ-2h-6wJ">
                         <rect key="frame" x="20" y="190" width="1881" height="22"/>
                         <searchFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" borderStyle="bezel" usesSingleLineMode="YES" bezelStyle="round" id="tJv-GR-OuA">
                             <font key="font" metaFont="system"/>
@@ -712,13 +712,13 @@
                         </searchFieldCell>
                     </searchField>
                     <scrollView autohidesScrollers="YES" horizontalLineScroll="17" horizontalPageScroll="10" verticalLineScroll="17" verticalPageScroll="10" usesPredominantAxisScrolling="NO" translatesAutoresizingMaskIntoConstraints="NO" id="jUU-Hf-uwt">
-                        <rect key="frame" x="20" y="20" width="1881" height="162"/>
+                        <rect key="frame" x="20" y="20" width="1881" height="106"/>
                         <clipView key="contentView" id="LCc-ZB-2MM">
-                            <rect key="frame" x="1" y="1" width="1879" height="160"/>
+                            <rect key="frame" x="1" y="1" width="1879" height="104"/>
                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                             <subviews>
                                 <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" autosaveColumns="NO" rowSizeStyle="automatic" headerView="rAR-Vo-4jF" viewBased="YES" id="JGO-3D-JlZ">
-                                    <rect key="frame" x="0.0" y="0.0" width="1879" height="132"/>
+                                    <rect key="frame" x="0.0" y="0.0" width="1879" height="76"/>
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                     <size key="intercellSpacing" width="17" height="0.0"/>
                                     <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
