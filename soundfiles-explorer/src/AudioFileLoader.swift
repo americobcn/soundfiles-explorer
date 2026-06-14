@@ -52,7 +52,7 @@ final class AudioFileLoader {
     
     nonisolated(unsafe) private let waveformCache: NSCache<NSString, WaveformCacheEntry>
     private let diskCache = WaveformDiskCache()
-    private static let pixelsPerSecond: CGFloat = 100
+    // private static let pixelsPerSecond: CGFloat = 100
 
     private class WaveformCacheEntry: NSObject {
         nonisolated let waveforms: [[Float]]
@@ -417,4 +417,8 @@ private final class WaveformDiskCache {
         }
         return waveforms
     }
+}
+
+extension AudioFileLoader {
+    nonisolated static let pixelsPerSecond: CGFloat = 100.0
 }

@@ -27,9 +27,9 @@ final class FolderScanner {
                 while let obj = enumerator.nextObject(), let url = obj as? URL {
                     guard (try? url.resourceValues(forKeys: Set(keys)).isRegularFile) == true else { continue }
                     let ext = url.pathExtension.lowercased()
-                    if Self.audioExtensions.contains(ext) {
+                    if await Self.audioExtensions.contains(ext) {
                         audioURLs.append(url)
-                    } else if Self.reportExtensions.contains(ext) {
+                    } else if await Self.reportExtensions.contains(ext) {
                         reportURLs.append(url)
                     }
                 }
