@@ -1216,13 +1216,10 @@
                 <constraints>
                     <constraint firstItem="1bJ-2h-6wJ" firstAttribute="trailing" secondItem="jUU-Hf-uwt" secondAttribute="trailing" id="6HC-gv-efR"/>
                     <constraint firstItem="kjg-HW-iyx" firstAttribute="leading" secondItem="EiT-Mj-1SZ" secondAttribute="leading" constant="20" symbolic="YES" id="Eer-B6-gY2"/>
-                    <constraint firstItem="kjg-HW-iyx" firstAttribute="top" secondItem="EiT-Mj-1SZ" secondAttribute="top" id="WOW-xR-8mA"/>
                     <constraint firstItem="kjg-HW-iyx" firstAttribute="trailing" secondItem="1bJ-2h-6wJ" secondAttribute="trailing" id="ZAp-eZ-FtH"/>
                     <constraint firstAttribute="bottom" secondItem="jUU-Hf-uwt" secondAttribute="bottom" constant="20" symbolic="YES" id="nmD-Zt-oST"/>
                     <constraint firstItem="kjg-HW-iyx" firstAttribute="leading" secondItem="1bJ-2h-6wJ" secondAttribute="leading" id="pQg-tX-dQ0"/>
                     <constraint firstItem="1bJ-2h-6wJ" firstAttribute="leading" secondItem="jUU-Hf-uwt" secondAttribute="leading" id="tvb-Jf-1fF"/>
-                    <constraint firstItem="1bJ-2h-6wJ" firstAttribute="top" secondItem="kjg-HW-iyx" secondAttribute="bottom" constant="8" symbolic="YES" id="yIz-xY-pa3"/>
-                    <constraint firstItem="jUU-Hf-uwt" firstAttribute="top" secondItem="1bJ-2h-6wJ" secondAttribute="bottom" constant="8" symbolic="YES" id="z5B-6U-yND"/>
                 </constraints>
             </view>
             <connections>

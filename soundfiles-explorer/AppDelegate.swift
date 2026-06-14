@@ -33,6 +33,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         splitVC.addSplitViewItem(contentItem)
 
         window.contentViewController = splitVC
+
+        if let visibleFrame = window.screen?.visibleFrame {
+            var frame = window.frame
+            frame.size.width = min(frame.size.width, visibleFrame.width)
+            frame.size.height = min(frame.size.height, visibleFrame.height)
+            frame.origin.x = min(max(frame.origin.x, visibleFrame.minX), visibleFrame.maxX - frame.size.width)
+            frame.origin.y = min(max(frame.origin.y, visibleFrame.minY), visibleFrame.maxY - frame.size.height)
+            window.setFrame(frame, display: false)
+        }
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {

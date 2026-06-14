@@ -118,7 +118,6 @@ class MVC: NSViewController, NSTableViewDelegate, NSTableViewDataSource, NSSearc
             waveformContainer.topAnchor.constraint(equalTo: mainStack.topAnchor),
             waveformContainer.leadingAnchor.constraint(equalTo: mainStack.leadingAnchor),
             waveformContainer.trailingAnchor.constraint(equalTo: mainStack.trailingAnchor),
-            controlsStackView.topAnchor.constraint(equalTo: waveformContainer.bottomAnchor),
             controlsStackView.bottomAnchor.constraint(equalTo: mainStack.bottomAnchor),
             controlsStackView.heightAnchor.constraint(equalToConstant: 48)
         ])
