@@ -303,7 +303,7 @@ class AudioPlaybackManager: NSObject {
 
     private static func makeChannelMuteTap(state: ChannelMuteState) -> MTAudioProcessingTap? {
         let clientInfo = Unmanaged.passRetained(state).toOpaque()
-
+        
         var callbacks = MTAudioProcessingTapCallbacks(
             version: kMTAudioProcessingTapCallbacksVersion_0,
             clientInfo: clientInfo,
@@ -313,20 +313,29 @@ class AudioPlaybackManager: NSObject {
             unprepare: nil,
             process: channelMuteTapProcess
         )
-
-        var tap: MTAudioProcessingTap?
+        
+#if compiler(<6.1)
+        var tap: Unmanaged<MTAudioProcessingTap>? //MTAudioProcessingTap? | Unmanaged<MTAudioProcessingTap>?
+#else
+        var tap:MTAudioProcessingTap?
+#endif
+        
         let status = MTAudioProcessingTapCreate(
             kCFAllocatorDefault,
             &callbacks,
             kMTAudioProcessingTapCreationFlag_PostEffects,
             &tap
         )
-
+        
         guard status == noErr, let tap = tap else {
             Unmanaged<ChannelMuteState>.fromOpaque(clientInfo).release()
             return nil
         }
-
+            
+#if compiler(<6.1)
+        return tap.takeRetainedValue()
+#else
         return tap
+#endif
     }
 }

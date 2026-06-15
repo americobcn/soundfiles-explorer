@@ -8,7 +8,7 @@ struct ScanResult {
 
 final class FolderScanner {
     static let audioExtensions: Set<String> = ["wav", "aiff", "aif", "mp3", "flac", "caf"]
-    static let reportExtensions: Set<String> = ["csv", "xlsx", "pdf", "xml", "json"]
+    static let reportExtensions: Set<String> = ["csv", "xlsx", "pdf", "xml", "json", "html"]
 
     func scan(folders: [URL]) async -> ScanResult {
         await Task.detached(priority: .utility) {
@@ -27,11 +27,20 @@ final class FolderScanner {
                 while let obj = enumerator.nextObject(), let url = obj as? URL {
                     guard (try? url.resourceValues(forKeys: Set(keys)).isRegularFile) == true else { continue }
                     let ext = url.pathExtension.lowercased()
+                    
+#if compiler(<6.1)
+                    if Self.audioExtensions.contains(ext) {
+                        audioURLs.append(url)
+                    } else if Self.reportExtensions.contains(ext) {
+                        reportURLs.append(url)
+                    }
+#else
                     if await Self.audioExtensions.contains(ext) {
                         audioURLs.append(url)
                     } else if await Self.reportExtensions.contains(ext) {
                         reportURLs.append(url)
                     }
+#endif
                 }
             }
 
