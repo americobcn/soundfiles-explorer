@@ -46,3 +46,13 @@ xcuserdata/
 !*.xcworkspace/contents.xcworkspacedata
 /*.gcno
 **/xcshareddata/WorkspaceSettings.xcsettings
+
+
+### Project excludes ###
+
+.superpowers/
+.agents/
+.claude/
+graphify-out/
+docs/
+
