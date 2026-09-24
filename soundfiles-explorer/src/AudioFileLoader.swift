@@ -329,7 +329,7 @@ final class AudioFileLoader {
 
 // MARK: - Waveform Disk Cache
 
-/// Binary on-disk waveform cache stored in ~/Library/Caches/<BundleID>/waveforms/
+/// Binary on-disk waveform cache stored in /Users/Shared/soundfiles-explorer/waveforms/
 /// Cache entries are invalidated when the source file's modification date changes.
 ///
 /// Binary format:
@@ -343,10 +343,8 @@ private final class WaveformDiskCache {
     private let cacheDirectory: URL
 
     init() {
-        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-        let bundleID = Bundle.main.bundleIdentifier ?? "soundfiles-explorer"
-        cacheDirectory = base.appendingPathComponent(bundleID).appendingPathComponent("waveforms")
-        try? FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+        cacheDirectory = SharedStorage.waveformsDirectory
+        try? SharedStorage.ensureDirectory(cacheDirectory)
     }
 
     // MARK: - Public

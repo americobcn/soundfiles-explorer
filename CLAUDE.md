@@ -39,7 +39,8 @@ MVC pattern throughout. Key files:
 - **`src/AudioRegionExporter.swift`** — Exports a selected waveform region to a new WAV file (drag-to-DAW), preserving BEXT/iXML metadata.
 - **`src/FolderScanner.swift`** — Scans dropped/added folders for audio files and sound-report documents, returning a `ScanResult`.
 - **`src/ProjectModels.swift`** — `Codable` models persisted to disk: `Project`, `AudioFileRecord` (flattened metadata + `bext`/`ixml`), `SoundReportRecord`.
-- **`src/ProjectStore.swift`** — Loads/saves `projects.json` (`~/Library/Application Support/com.americobcn.soundfiles-explorer/`), tracks `activeProject`, posts project change notifications.
+- **`src/SharedStorage.swift`** — Machine-wide storage root `/Users/Shared/soundfiles-explorer/` (projects DB + `waveforms/` cache); creates directories with 0777 so all user accounts can write.
+- **`src/ProjectStore.swift`** — Loads/saves `projects.json` (in `SharedStorage.root`; one-time copy from the legacy `~/Library/Application Support/com.americobcn.soundfiles-explorer/`), tracks `activeProject`, posts project change notifications.
 - **`Views/AudioWaveformView.swift`** — `NSView` subclass rendering per-channel waveforms using `CALayer`. Exposes `currentTime`, `pixelsPerSecond`, `waveformColors`, etc. Posts `AudioWaveformViewDidSeek` notification on click-to-seek.
 - **`Views/AudioWaveformExtensions.swift`** — Extensions supporting the waveform view.
 - **`Views/AC3TableView.swift`** — Custom `NSTableView` subclass.

@@ -14,6 +14,7 @@ final class ProjectStore {
     // MARK: - Load / Save
 
     func load() throws {
+        try migrateLegacyStoreIfNeeded()
         guard FileManager.default.fileExists(atPath: storeURL.path) else { return }
         let data = try Data(contentsOf: storeURL)
         let decoder = JSONDecoder()
@@ -26,8 +27,7 @@ final class ProjectStore {
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = .prettyPrinted
         let data = try encoder.encode(projects)
-        let dir = storeURL.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try SharedStorage.ensureDirectory(SharedStorage.root)
         try data.write(to: storeURL, options: .atomic)
     }
 
@@ -41,11 +41,18 @@ final class ProjectStore {
         }
     }
 
-    private var storeURL: URL {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return support
+    private var storeURL: URL { SharedStorage.projectsFile }
+
+    /// One-time copy of the pre-shared-storage per-user database, so existing projects aren't lost.
+    private func migrateLegacyStoreIfNeeded() throws {
+        let fm = FileManager.default
+        let support = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let legacyURL = support
             .appendingPathComponent("com.americobcn.soundfiles-explorer")
             .appendingPathComponent("projects.json")
+        guard !fm.fileExists(atPath: storeURL.path), fm.fileExists(atPath: legacyURL.path) else { return }
+        try SharedStorage.ensureDirectory(SharedStorage.root)
+        try fm.copyItem(at: legacyURL, to: storeURL)
     }
 
     // MARK: - Mutations
